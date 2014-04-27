@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual C# Express 2010
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "kinect_cv", "kinect_cv.csproj", "{DDD7C988-04C7-40FC-8905-597AC2FF484A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoordinateMappingBasics-WPF", "..\..\CoordinateMappingBasics-WPF\CoordinateMappingBasics-WPF.csproj", "{BA49DE61-9346-4156-B382-75C2D5370DCD}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,16 +23,6 @@ Global
 		{DDD7C988-04C7-40FC-8905-597AC2FF484A}.Release|Mixed Platforms.Build.0 = Release|x86
 		{DDD7C988-04C7-40FC-8905-597AC2FF484A}.Release|x86.ActiveCfg = Release|x86
 		{DDD7C988-04C7-40FC-8905-597AC2FF484A}.Release|x86.Build.0 = Release|x86
-		{BA49DE61-9346-4156-B382-75C2D5370DCD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BA49DE61-9346-4156-B382-75C2D5370DCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BA49DE61-9346-4156-B382-75C2D5370DCD}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
-		{BA49DE61-9346-4156-B382-75C2D5370DCD}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
-		{BA49DE61-9346-4156-B382-75C2D5370DCD}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{BA49DE61-9346-4156-B382-75C2D5370DCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BA49DE61-9346-4156-B382-75C2D5370DCD}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BA49DE61-9346-4156-B382-75C2D5370DCD}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
-		{BA49DE61-9346-4156-B382-75C2D5370DCD}.Release|Mixed Platforms.Build.0 = Release|Any CPU
-		{BA49DE61-9346-4156-B382-75C2D5370DCD}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

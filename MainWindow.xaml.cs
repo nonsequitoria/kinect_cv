@@ -242,6 +242,19 @@ namespace kinect_cv
             }
 
 
+            Skeleton[] skeletons = new Skeleton[0];
+            using (SkeletonFrame skeletonFrame = e.OpenSkeletonFrame())
+            {
+                if (skeletonFrame != null)
+                {
+                    skeletons = new Skeleton[skeletonFrame.SkeletonArrayLength];
+                    skeletonFrame.CopySkeletonDataTo(skeletons);
+                }
+            }
+
+
+
+
             if (true == colorReceived)
             {
 
@@ -249,8 +262,27 @@ namespace kinect_cv
                 colourImage = new Image<Bgr, byte>(ToBitmap(colorPixels,
                     sensor.ColorStream.FrameWidth, this.sensor.ColorStream.FrameHeight));
 
+
+                int id = TrackClosestSkeleton(skeletons);
+
+                if (id > 0)
+                {
+                    Skeleton skeleton = skeletons.First(s => s.TrackingId == id);
+
+
+                    SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
+
+                    ColorImagePoint left = sensor.CoordinateMapper.MapSkeletonPointToColorPoint(sleft, sensor.ColorStream.Format);
+                    //(sleft, sensor.ColorStream.Format);
+
+                    System.Drawing.PointF p = new System.Drawing.PointF(left.X, left.Y);
+
+                    colourImage.Draw(new CircleF(p, 10), new Bgr(255, 0, 0), -1);
+
+                }
+
                
-                String debugMsg = String.Format("{0}", colorFrameNum);
+                String debugMsg = String.Format("{0} Sk: {1}", colorFrameNum, id);
                 colourImage.Draw(debugMsg, ref debugFont, new System.Drawing.Point(10, 80), new Bgr(255, 255, 255));
 
 
@@ -275,6 +307,39 @@ namespace kinect_cv
 
             }
 
+        }
+
+
+        private int TrackClosestSkeleton(Skeleton[] skeletons)
+        {
+            if (this.sensor != null && this.sensor.SkeletonStream != null)
+            {
+                if (!this.sensor.SkeletonStream.AppChoosesSkeletons)
+                {
+                    this.sensor.SkeletonStream.AppChoosesSkeletons = true; // Ensure AppChoosesSkeletons is set
+                }
+
+                float closestDistance = 10000f; // Start with a far enough distance
+                int closestID = 0;
+
+                foreach (Skeleton skeleton in skeletons.Where(s => s.TrackingState != SkeletonTrackingState.NotTracked))
+                {
+                    if (skeleton.Position.Z < closestDistance)
+                    {
+                        closestID = skeleton.TrackingId;
+                        closestDistance = skeleton.Position.Z;
+                    }
+                }
+
+                if (closestID > 0)
+                {
+                    this.sensor.SkeletonStream.ChooseSkeletons(closestID); // Track this skeleton
+                }
+
+                return closestID;
+            }
+
+            return -1;
         }
 
 
