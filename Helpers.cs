@@ -30,8 +30,16 @@ namespace KinectCV.Helpers
 
     }
 
-    class Utilities
+    public class Utilities
     {
+        public static double Distance(PointF a, PointF b)
+        {
+            return Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2));
+        }
 
+        public static PointF MidPoint(PointF a, PointF b)
+        {
+            return new PointF(a.X + (b.X - a.X) / 2, a.Y + (b.Y - a.Y) / 2);
+        }
     }
 }

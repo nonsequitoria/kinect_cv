@@ -313,6 +313,8 @@ namespace KinectCV
                 playerMask = new Image<Gray, byte>(ToBitmap(playerPixelData,
                     sensor.DepthStream.FrameWidth, this.sensor.DepthStream.FrameHeight,
                     System.Drawing.Imaging.PixelFormat.Format8bppIndexed));
+
+   
             }
 
             #endregion
@@ -327,10 +329,17 @@ namespace KinectCV
                 displayImage = displayImage.SmoothBlur(30, 30);
 
                 // mask out the depth image for player mask
-                depthImage.SetValue(new Gray(0), playerMask.Not());
+                //depthImage.SmoothMedian(5);
+                depthImage.SetValue(new Gray(2000), playerMask.Not());
+
+                Image<Gray, Byte> depthImage8 = depthImage.Convert<Gray, Byte>();
+
 
                 debugImg1 = colourImage.Copy();
-                debugImg2 = depthImage.Convert<Bgr, Byte>();
+                debugImg2 = depthImage8.Convert<Bgr, Byte>();
+
+                // get body depth
+                SkeletonPoint sposition = skeleton.Position;
 
                 // get the left and right hand skeleton positions
                 SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
@@ -340,16 +349,89 @@ namespace KinectCV
                 DepthImagePoint dleft = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sleft, sensor.DepthStream.Format);
                 DepthImagePoint dright = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sright, sensor.DepthStream.Format);
 
+                // see if hands are in painting area
+                float painting_offset = 0.25f;
+                bool isLeftPainting = ((sposition.Z - sleft.Z) > painting_offset);
+                bool isRightPainting = ((sposition.Z - sright.Z) > painting_offset);
+
                 // get a ROI around the hands
-                System.Drawing.SizeF roi_size = new System.Drawing.SizeF(60, 60);
+                float roi_diameter = 60;
+                System.Drawing.SizeF roi_size = new System.Drawing.SizeF(roi_diameter, roi_diameter);
+
+                // left hand
                 MCvBox2D leftRoi = new MCvBox2D(dleft.ToPointF(), roi_size, 0);
-                Image<Gray, Double> leftDepth = depthImage.Copy(leftRoi);
+                Image<Gray, Byte> leftDepth = depthImage8.Copy(leftRoi);
+
+                if (true || isLeftPainting)
+                {
+                    //Image<Gray, Byte> leftDepth = leftDepth.Convert<Gray, Byte>();
+
+                    Image<Gray, Byte> mask = leftDepth.ThresholdBinaryInv(new Gray(5), new Gray(255));
+                    //mask = mask.Erode(5);
+                    leftDepth.SetValue(255, mask);
+
+                    //double[] minvals;
+                    //double[] maxvals;
+                    //Point[] minpoints;
+                    //Point[] maxpoints;
+                    //leftDepth.MinMax(out minvals, out maxvals, out minpoints, out maxpoints);
+
+                    double max = byte.MinValue;
+                    double min = byte.MaxValue;
+                    for (int y = 0; y < leftDepth.Height; y++)
+                        for (int x = 0; x < leftDepth.Width; x++)
+                        {
+                            byte v = leftDepth.Data[y, x, 0];
+
+                            if (v == 0) continue;
+                            if (v > max) max = v;
+                            if (v < min) min = v;
+                        }
+
+                    WriteDebugText(debugImg2, (int)leftRoi.center.X, (int)leftRoi.center.Y,
+                            String.Format("{0:0} {1:0}",min, max));
+
+                    Image<Gray, Byte> leftBrush = leftDepth.Copy();
+
+                    leftBrush = leftBrush.ThresholdBinaryInv(new Gray(min + 10), new Gray(255));
+
+                    //double vv = min + 10;
+                    //for (int y = 0; y < leftBrush.Height; y++)
+                    //    for (int x = 0; x < leftBrush.Width; x++)
+                    //    {
+                    //        if (leftBrush.Data[y, x, 0] > vv) leftBrush.Data[y, x, 0] = 0;
+                    //        else leftBrush.Data[y, x, 0] = 255;
+                    //    }
+
+                    Rectangle leftWin = new Rectangle(10, 10, (int)roi_size.Width, (int)roi_size.Height);
+                    debugImg1.ROI = leftWin;
+                    leftBrush.Convert<Bgr, Byte>().CopyTo(debugImg1);
+                    debugImg1.ROI = Rectangle.Empty;
+
+                    //leftBrush.Convert<Gray, Byte>().ThresholdToZero(new Gray(100));
+                    //leftDepth.ThresholdToZero(new Gray(min + 5));
+
+                }
+
+                // right hand
                 MCvBox2D rightRoi = new MCvBox2D(dright.ToPointF(), roi_size, 0);
                 Image<Gray, Double> rightDepth = depthImage.Copy(rightRoi);
                
                 // draw the ROI for debug
-                debugImg2.Draw(leftRoi, new Bgr(Color.Red), 1);
-                debugImg2.Draw(rightRoi, new Bgr(Color.Blue), 1);
+                //debugImg2.Draw(leftRoi, new Bgr(Color.Red), isLeftPainting ? 5 : 1);
+                debugImg2.Draw(rightRoi, new Bgr(Color.Blue), isRightPainting ? 5 : 1);
+
+                // see if the hand ROI intersect
+                if (Utilities.Distance(leftRoi.center, rightRoi.center) < roi_diameter)
+                {
+                    PointF p = Utilities.MidPoint(leftRoi.center, rightRoi.center);
+                    //debugImg2.Draw(new CircleF(p, roi_diameter/2), new Bgr(0, 255, 0), 1);
+                    System.Drawing.SizeF both_roi_size = new System.Drawing.SizeF(roi_diameter * 1.5f, roi_diameter * 1.5f);
+                    MCvBox2D bothRoi = new MCvBox2D(p, both_roi_size, 0);
+                    Image<Gray, Double> bothDepth = depthImage.Copy(bothRoi);
+                    debugImg2.Draw(bothRoi, new Bgr(Color.Yellow), 1);
+                }
+
 
                 //state.PlayerMask.ROI = leftRoi.MinAreaRect();
                 //leftHandImg.SetValue(new Bgr(255, 255, 255), state.PlayerMask.Not());
@@ -470,7 +552,13 @@ namespace KinectCV
             }
             return -1;
         }
-
+            
+            
+        public void WriteDebugText(Image<Bgr, Byte> img, int x, int y, string text, params object[] args)
+        {
+            img.Draw(String.Format(text, args), ref debugFont, new Point(x,y), new Bgr(255, 255, 255));
+        }
+            
 
         public static System.Drawing.Bitmap ToBitmap(byte[] pixels, int width, int height)
         {
