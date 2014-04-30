@@ -18,12 +18,22 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 
-
+// Emgu library
 using Emgu.CV;
 using Emgu.CV.CvEnum;
 using Emgu.CV.Structure;
 
-namespace kinect_cv
+using KinectCV.Helpers;
+
+// default to using System.Drawing graphics to make using EMGU easier 
+using Point = System.Drawing.Point;
+using PointF = System.Drawing.PointF;
+using Color = System.Drawing.Color;
+using Rectangle = System.Drawing.Rectangle;
+using WpfColor = System.Windows.Media.Color;
+using WpfPoint = System.Windows.Point;
+
+namespace KinectCV
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -86,14 +96,18 @@ namespace kinect_cv
 
         private InteropBitmapHelper DebugImg1Helper = null;
         private InteropBitmapHelper DebugImg2Helper = null;
+        private InteropBitmapHelper DisplayImageHelper = null;
 
-        MCvFont debugFont = new MCvFont(FONT.CV_FONT_HERSHEY_PLAIN, 1.0, 1.0); //Create the font
+        MCvFont debugFont = new MCvFont(FONT.CV_FONT_HERSHEY_PLAIN, 2.0, 2.0); 
 
+        // processing images
         Image<Bgr, byte> colourImage;
         Image<Gray, Double> depthImage;
         Image<Gray, byte> playerMask;
 
-        //DisplayWindow displayWindow;
+        // the actual image to display
+        Image<Bgr, byte> displayImage;
+        DisplayWindow displayWindow;
 
         public MainWindow()
         {
@@ -104,10 +118,6 @@ namespace kinect_cv
         {
 
             Debug.WriteLine("Window_Loaded");
-
-
-
-
 
             // Look through all sensors and start the first connected one.
             // This requires that a Kinect is connected at the time of app startup.
@@ -153,6 +163,9 @@ namespace kinect_cv
                 // This is the bitmap we'll display on-screen
                 this.colorBitmap = new WriteableBitmap(colorWidth, colorHeight, 96.0, 96.0, PixelFormats.Bgr32, null);
 
+                // output image
+                displayImage = new Image<Bgr, byte>(colorWidth, colorHeight);
+
                 this.MaskedColor.Source = this.colorBitmap;
 
                 // event handler when frames are ready
@@ -179,12 +192,8 @@ namespace kinect_cv
                 statusBarText.Text = String.Format("{0}", sensor.UniqueKinectId);
 
                 // create the display window
-                //displayWindow = new DisplayWindow(sensor);
-                //displayWindow.Show();
-
-                // Add an event handler to be called whenever there is new depth frame data
-                //sensor.AllFramesReady += displayWindow.SensorAllFramesReady;
-
+                displayWindow = new DisplayWindow();
+                displayWindow.Show();
             }
 
             // Emgu window setup
@@ -198,9 +207,8 @@ namespace kinect_cv
         {
             Debug.WriteLine("Window_Closing");
 
-            //sensor.AllFramesReady -= displayWindow.SensorAllFramesReady;
-            // displayWindow.Close();
-            //displayWindow = null;
+            displayWindow.Close();
+            displayWindow = null;
 
             if (null != this.sensor)
             {
@@ -219,9 +227,6 @@ namespace kinect_cv
 
         private void SensorAllFramesReady(object sender, AllFramesReadyEventArgs e)
         {
-
-
-
             #region get image and skeleton data from Kinect
 
             // if in the middle of shutting down, so nothing to do
@@ -278,18 +283,12 @@ namespace kinect_cv
                 // get Emgu colour image 
                 colourImage = new Image<Bgr, byte>(ToBitmap(colorPixels,
                     sensor.ColorStream.FrameWidth, this.sensor.ColorStream.FrameHeight));
-
-                String debugMsg = String.Format("{0} Sk: {1}", colorFrameNum, id);
-                colourImage.Draw(debugMsg, ref debugFont, new System.Drawing.Point(10, 80), new Bgr(255, 255, 255));
             }
 
             if (depthReceived)
             {
                 Array.Clear(this.playerPixelData, 0, this.playerPixelData.Length);
-                short short_id = (short) id;
                 byte byte_id = (byte)255;
-
-                Debug.Print("{0} {1} {2}", id, short_id, byte_id);
 
                 // create Emgu depth and playerMask images
                 depthImage = new Image<Gray, Double>(sensor.DepthStream.FrameWidth, this.sensor.DepthStream.FrameHeight);
@@ -302,20 +301,14 @@ namespace kinect_cv
                         // calculate index into depth array
                         int depthIndex = x + (y * this.depthWidth);
                         DepthImagePixel depthPixel = this.depthPixels[depthIndex];
-                        //ColorImagePoint colorImagePoint = this.colorCoordinates[depthIndex];
-                        //int v = (int)(depthPixel.Depth - sensor.DepthStream.MinDepth) / (sensor.DepthStream.MaxDepth - sensor.DepthStream.MinDepth);
                         depthImage.Data[y, x, 0] = depthPixel.Depth;
                         
-                        //justDepthPixels[depthIndex] = (byte)depthPixel.Depth;
-                        if  (depthPixel.PlayerIndex > 0)
+                         if  (depthPixel.PlayerIndex > 0)
                         {
                             playerPixelData[depthIndex] = byte_id;
-
                         }
                     }
                 }
-
-
 
                 playerMask = new Image<Gray, byte>(ToBitmap(playerPixelData,
                     sensor.DepthStream.FrameWidth, this.sensor.DepthStream.FrameHeight,
@@ -324,31 +317,81 @@ namespace kinect_cv
 
             #endregion
 
-            #region use the emgu images
+            #region use the emgu images to do something
+            
+            // 
+            if (skeleton != null && colourImage != null && depthImage != null)
+            {
 
-            if (colourImage != null)
-            {
+                displayImage = colourImage.Copy();
+                displayImage = displayImage.SmoothBlur(30, 30);
+
+                // mask out the depth image for player mask
+                depthImage.SetValue(new Gray(0), playerMask.Not());
+
                 debugImg1 = colourImage.Copy();
-            }
-            if (skeleton != null)
-            {
+                debugImg2 = depthImage.Convert<Bgr, Byte>();
+
+                // get the left and right hand skeleton positions
                 SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
-                ColorImagePoint left = sensor.CoordinateMapper.MapSkeletonPointToColorPoint(sleft, sensor.ColorStream.Format);
-                System.Drawing.PointF p = new System.Drawing.PointF(left.X, left.Y);
-                debugImg1.Draw(new CircleF(p, 10), new Bgr(255, 0, 0), -1);
+                SkeletonPoint sright= skeleton.Joints[JointType.HandRight].Position;
+
+                // convert skeleton hand positions to depth image positions
+                DepthImagePoint dleft = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sleft, sensor.DepthStream.Format);
+                DepthImagePoint dright = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sright, sensor.DepthStream.Format);
+
+                // get a ROI around the hands
+                System.Drawing.SizeF roi_size = new System.Drawing.SizeF(60, 60);
+                MCvBox2D leftRoi = new MCvBox2D(dleft.ToPointF(), roi_size, 0);
+                Image<Gray, Double> leftDepth = depthImage.Copy(leftRoi);
+                MCvBox2D rightRoi = new MCvBox2D(dright.ToPointF(), roi_size, 0);
+                Image<Gray, Double> rightDepth = depthImage.Copy(rightRoi);
+               
+                // draw the ROI for debug
+                debugImg2.Draw(leftRoi, new Bgr(Color.Red), 1);
+                debugImg2.Draw(rightRoi, new Bgr(Color.Blue), 1);
+
+                //state.PlayerMask.ROI = leftRoi.MinAreaRect();
+                //leftHandImg.SetValue(new Bgr(255, 255, 255), state.PlayerMask.Not());
+                //state.PlayerMask.ROI = Rectangle.Empty;
 
                 
+
+                // draw the hand images
+                //Rectangle leftWin = new Rectangle(10, 10, (int)roi_size.Width, (int)roi_size.Height);
+                //DebugImg.Draw(leftRoi, c, 1);
+                //DebugImg.ROI = leftWin;
+                //leftHandImg.CopyTo(DebugImg);
+                //DebugImg.ROI = Rectangle.Empty;
+                //DebugImg.Draw(leftWin, c, 1);
+
+
+                //System.Drawing.PointF p = new System.Drawing.PointF(left.X, left.Y);
+                //debugImg1.Draw(new CircleF(p, 10), new Bgr(255, 0, 0), -1);
+
+                // get the ROI around the skeleton hand position
+
+                //displayImage = colourImage;
+
+            }
+            else if (colourImage != null)
+            {
+                displayImage = colourImage.Copy();
+
+                debugImg1 = displayImage.Copy();
+                debugImg2 = depthImage.Convert<Bgr, Byte>();
+
+            }
+            else
+            {
+                displayImage.SetValue(new Bgr(Color.CadetBlue));
             }
 
-            if (playerMask != null)
-            {
-                debugImg2 = depthImage.Convert<Bgr, Byte>();
-            }
-            sensor.CoordinateMapper.MapDepthFrameToColorFrame(
-                DepthFormat,
-                this.depthPixels,
-                ColorFormat,
-                this.colorCoordinates);
+            //sensor.CoordinateMapper.MapDepthFrameToColorFrame(
+            //    DepthFormat,
+            //    this.depthPixels,
+            //    ColorFormat,
+            //    this.colorCoordinates);
 
 
             #endregion
@@ -356,15 +399,31 @@ namespace kinect_cv
 
             //CvInvoke.cvShowImage(win1, colourImage);
 
+            // display image
+            if (displayImage != null)
+            {
+                if (DisplayImageHelper == null)
+                {
+                    DisplayImageHelper = new InteropBitmapHelper(displayImage.Width, displayImage.Height, displayImage.Bytes, PixelFormats.Bgr24);
+                    displayWindow.DisplayImageSource = DisplayImageHelper.InteropBitmap;
+                }
+                DisplayImageHelper.UpdateBits(displayImage.Bytes);
+            }
+
             // display debug images
             if (debugImg1 != null)
             {
+                String debugMsg = String.Format("{0} Sk: {1}", colorFrameNum, id);
+                debugImg1.Draw(debugMsg, ref debugFont, new System.Drawing.Point(10, 30), new Bgr(255, 255, 255));
+
                 if (DebugImg1Helper == null)
                 {
                     DebugImg1Helper = new InteropBitmapHelper(debugImg1.Width, debugImg1.Height, debugImg1.Bytes, PixelFormats.Bgr24);
                     MaskedColor.Source = DebugImg1Helper.InteropBitmap;
                 }
                 DebugImg1Helper.UpdateBits(debugImg1.Bytes);
+
+
             }
 
             if (debugImg2 != null)

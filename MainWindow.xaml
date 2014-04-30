@@ -1,4 +1,4 @@
-﻿<Window x:Class="kinect_cv.MainWindow"
+﻿<Window x:Class="KinectCV.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="kinect_cv" Height="688" Width="412"

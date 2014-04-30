@@ -1,8 +1,8 @@
-﻿<Window x:Class="kinect_cv.DisplayWindow"
+﻿<Window x:Class="KinectCV.DisplayWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="DisplayWindow" Height="300" Width="300">
-    <Grid>
-        
+        Title="DisplayWindow" Height="640" Width="480">
+    <Grid Background="Black">
+        <Image Name ="DisplayImage"/>
     </Grid>
 </Window>

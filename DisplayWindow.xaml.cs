@@ -18,7 +18,7 @@ using Emgu.CV.Structure;
 
 using Microsoft.Kinect;
 
-namespace kinect_cv
+namespace KinectCV
 {
     /// <summary>
     /// Interaction logic for DisplayWindow.xaml
@@ -26,66 +26,18 @@ namespace kinect_cv
     public partial class DisplayWindow : Window
     {
 
-
-        private byte[] colorPixels;
-        private DepthImagePixel[] depthPixels;
-
-        Emgu.CV.Image<Bgr, byte> emguColour;
-
-        public DisplayWindow(KinectSensor sensor)
+        public DisplayWindow()
         {
             InitializeComponent();
-
-            // Allocate space to put the depth pixels we'll receive
-            depthPixels = new DepthImagePixel[sensor.DepthStream.FramePixelDataLength];
-
-            // Allocate space to put the color pixels we'll create
-            colorPixels = new byte[sensor.ColorStream.FramePixelDataLength];
-
-
-
         }
 
-        public void SensorAllFramesReady(object sender, AllFramesReadyEventArgs e)
+        public ImageSource DisplayImageSource
         {
-            bool depthReceived = false;
-            bool colorReceived = false;
-
-            using (DepthImageFrame depthFrame = e.OpenDepthImageFrame())
-            {
-                if (null != depthFrame)
-                {
-                    // Copy the pixel data from the image to a temporary array
-                    depthFrame.CopyDepthImagePixelDataTo(this.depthPixels);
-
-                    depthReceived = true;
-                }
-            }
-
-            using (ColorImageFrame colorFrame = e.OpenColorImageFrame())
-            {
-                if (null != colorFrame)
-                {
-                    // Copy the pixel data from the image to a temporary array
-                    colorFrame.CopyPixelDataTo(this.colorPixels);
-                    
-                    colorReceived = true;
-                }
-            }
-
-
-
-
-
-           
-
-            if (colorReceived != null)
-            {
-                //emguColour = new Image<Bgr, byte>(ToBitmap(colorPixels, 640, 480));
-
-            }
-
+            get { return DisplayImage.Source; }
+            set {DisplayImage.Source = value; }
         }
+
+
 
     }
 }

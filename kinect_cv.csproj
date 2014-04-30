@@ -8,7 +8,7 @@
     <ProjectGuid>{DDD7C988-04C7-40FC-8905-597AC2FF484A}</ProjectGuid>
     <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>kinect_cv</RootNamespace>
+    <RootNamespace>KinectCV</RootNamespace>
     <AssemblyName>kinect_cv</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <TargetFrameworkProfile>Client</TargetFrameworkProfile>
@@ -81,6 +81,7 @@
     <Compile Include="DisplayWindow.xaml.cs">
       <DependentUpon>DisplayWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="Helpers.cs" />
     <Compile Include="InteropBitmapHelper.cs" />
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
