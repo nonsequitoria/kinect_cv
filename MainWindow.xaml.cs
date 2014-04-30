@@ -63,7 +63,8 @@ namespace kinect_cv
         /// <summary>
         /// Intermediate storage for the player opacity mask
         /// </summary>
-        private int[] playerPixelData;
+        private byte[] playerPixelData;
+        byte[] justDepthPixels;
 
         /// <summary>
         /// Intermediate storage for the depth to color mapping
@@ -83,11 +84,14 @@ namespace kinect_cv
         private int opaquePixelValue = -1;
 
 
-        private InteropBitmapHelper mColorImageHelper = null;
+        private InteropBitmapHelper DebugImg1Helper = null;
+        private InteropBitmapHelper DebugImg2Helper = null;
 
         MCvFont debugFont = new MCvFont(FONT.CV_FONT_HERSHEY_PLAIN, 1.0, 1.0); //Create the font
 
         Image<Bgr, byte> colourImage;
+        Image<Gray, Double> depthImage;
+        Image<Gray, byte> playerMask;
 
         //DisplayWindow displayWindow;
 
@@ -102,7 +106,7 @@ namespace kinect_cv
             Debug.WriteLine("Window_Loaded");
 
 
-           
+
 
 
             // Look through all sensors and start the first connected one.
@@ -141,7 +145,8 @@ namespace kinect_cv
                 // Allocate space to put the color pixels we'll create
                 this.colorPixels = new byte[this.sensor.ColorStream.FramePixelDataLength];
 
-                this.playerPixelData = new int[this.sensor.DepthStream.FramePixelDataLength];
+                this.playerPixelData = new byte[this.sensor.DepthStream.FramePixelDataLength];
+                justDepthPixels = new byte[this.sensor.DepthStream.FramePixelDataLength];
 
                 this.colorCoordinates = new ColorImagePoint[this.sensor.DepthStream.FramePixelDataLength];
 
@@ -183,7 +188,7 @@ namespace kinect_cv
             }
 
             // Emgu window setup
-            CvInvoke.cvNamedWindow(win1); //Create the window using the specific name
+            //CvInvoke.cvNamedWindow(win1); //Create the window using the specific name
         }
 
 
@@ -194,7 +199,7 @@ namespace kinect_cv
             Debug.WriteLine("Window_Closing");
 
             //sensor.AllFramesReady -= displayWindow.SensorAllFramesReady;
-           // displayWindow.Close();
+            // displayWindow.Close();
             //displayWindow = null;
 
             if (null != this.sensor)
@@ -205,12 +210,20 @@ namespace kinect_cv
 
             // Emgu window shutdown
             //CvInvoke.cvWaitKey(0);  //Wait for the key pressing event
-            CvInvoke.cvDestroyWindow(win1); //Destory the window
+            //CvInvoke.cvDestroyWindow(win1); //Destory the window
         }
 
 
+        Image<Bgr, Byte> debugImg1 = null;
+        Image<Bgr, Byte> debugImg2 = null;
+
         private void SensorAllFramesReady(object sender, AllFramesReadyEventArgs e)
         {
+
+
+
+            #region get image and skeleton data from Kinect
+
             // if in the middle of shutting down, so nothing to do
             if (null == this.sensor) return;
 
@@ -223,7 +236,6 @@ namespace kinect_cv
                 {
                     // Copy the pixel data from the image to a temporary array
                     depthFrame.CopyDepthImagePixelDataTo(this.depthPixels);
-
                     depthReceived = true;
                 }
             }
@@ -252,63 +264,122 @@ namespace kinect_cv
                 }
             }
 
+            // pick which skeleton to track
+            int id = TrackClosestSkeleton(skeletons);
+            Skeleton skeleton = null;
+            if (id > 0) skeleton = skeletons.First(s => s.TrackingId == id);
 
+            #endregion
 
+            #region convert kinect frame to emgu images
 
-            if (true == colorReceived)
+            if (colorReceived)
             {
-
-
+                // get Emgu colour image 
                 colourImage = new Image<Bgr, byte>(ToBitmap(colorPixels,
                     sensor.ColorStream.FrameWidth, this.sensor.ColorStream.FrameHeight));
 
-
-                int id = TrackClosestSkeleton(skeletons);
-
-                if (id > 0)
-                {
-                    Skeleton skeleton = skeletons.First(s => s.TrackingId == id);
-
-
-                    SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
-
-                    ColorImagePoint left = sensor.CoordinateMapper.MapSkeletonPointToColorPoint(sleft, sensor.ColorStream.Format);
-                    //(sleft, sensor.ColorStream.Format);
-
-                    System.Drawing.PointF p = new System.Drawing.PointF(left.X, left.Y);
-
-                    colourImage.Draw(new CircleF(p, 10), new Bgr(255, 0, 0), -1);
-
-                }
-
-               
                 String debugMsg = String.Format("{0} Sk: {1}", colorFrameNum, id);
                 colourImage.Draw(debugMsg, ref debugFont, new System.Drawing.Point(10, 80), new Bgr(255, 255, 255));
-
-
-                CvInvoke.cvShowImage(win1, colourImage);
-
-                // Write the pixel data into our bitmap
-                //this.colorBitmap.WritePixels(
-                //    new Int32Rect(0, 0, this.colorBitmap.PixelWidth, this.colorBitmap.PixelHeight),
-                //    this.colourImage.Bytes,
-                //    this.colorBitmap.PixelWidth * sizeof(int),
-                //    0);
-
-                //An interopBitmap is a WPF construct that enables resetting the Bits of the image.
-                //This is more efficient than doing a BitmapSource.Create call every frame.
-                if (mColorImageHelper == null)
-                {
-                    mColorImageHelper = new InteropBitmapHelper(colourImage.Width, colourImage.Height, colourImage.Bytes, PixelFormats.Bgr24);
-                    MaskedColor.Source = mColorImageHelper.InteropBitmap;
-                }
-
-                mColorImageHelper.UpdateBits(colourImage.Bytes);
-
             }
 
+            if (depthReceived)
+            {
+                Array.Clear(this.playerPixelData, 0, this.playerPixelData.Length);
+                short short_id = (short) id;
+                byte byte_id = (byte)255;
+
+                Debug.Print("{0} {1} {2}", id, short_id, byte_id);
+
+                // create Emgu depth and playerMask images
+                depthImage = new Image<Gray, Double>(sensor.DepthStream.FrameWidth, this.sensor.DepthStream.FrameHeight);
+
+                // loop over each row and column of the depth
+                for (int y = 0; y < this.depthHeight; y++)
+                {
+                    for (int x = 0; x < this.depthWidth; x++)
+                    {
+                        // calculate index into depth array
+                        int depthIndex = x + (y * this.depthWidth);
+                        DepthImagePixel depthPixel = this.depthPixels[depthIndex];
+                        //ColorImagePoint colorImagePoint = this.colorCoordinates[depthIndex];
+                        //int v = (int)(depthPixel.Depth - sensor.DepthStream.MinDepth) / (sensor.DepthStream.MaxDepth - sensor.DepthStream.MinDepth);
+                        depthImage.Data[y, x, 0] = depthPixel.Depth;
+                        
+                        //justDepthPixels[depthIndex] = (byte)depthPixel.Depth;
+                        if  (depthPixel.PlayerIndex > 0)
+                        {
+                            playerPixelData[depthIndex] = byte_id;
+
+                        }
+                    }
+                }
+
+
+
+                playerMask = new Image<Gray, byte>(ToBitmap(playerPixelData,
+                    sensor.DepthStream.FrameWidth, this.sensor.DepthStream.FrameHeight,
+                    System.Drawing.Imaging.PixelFormat.Format8bppIndexed));
+            }
+
+            #endregion
+
+            #region use the emgu images
+
+            if (colourImage != null)
+            {
+                debugImg1 = colourImage.Copy();
+            }
+            if (skeleton != null)
+            {
+                SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
+                ColorImagePoint left = sensor.CoordinateMapper.MapSkeletonPointToColorPoint(sleft, sensor.ColorStream.Format);
+                System.Drawing.PointF p = new System.Drawing.PointF(left.X, left.Y);
+                debugImg1.Draw(new CircleF(p, 10), new Bgr(255, 0, 0), -1);
+
+                
+            }
+
+            if (playerMask != null)
+            {
+                debugImg2 = depthImage.Convert<Bgr, Byte>();
+            }
+            sensor.CoordinateMapper.MapDepthFrameToColorFrame(
+                DepthFormat,
+                this.depthPixels,
+                ColorFormat,
+                this.colorCoordinates);
+
+
+            #endregion
+
+
+            //CvInvoke.cvShowImage(win1, colourImage);
+
+            // display debug images
+            if (debugImg1 != null)
+            {
+                if (DebugImg1Helper == null)
+                {
+                    DebugImg1Helper = new InteropBitmapHelper(debugImg1.Width, debugImg1.Height, debugImg1.Bytes, PixelFormats.Bgr24);
+                    MaskedColor.Source = DebugImg1Helper.InteropBitmap;
+                }
+                DebugImg1Helper.UpdateBits(debugImg1.Bytes);
+            }
+
+            if (debugImg2 != null)
+            {
+                if (DebugImg2Helper == null)
+                {
+                    DebugImg2Helper = new InteropBitmapHelper(debugImg2.Width, debugImg2.Height, debugImg2.Bytes, PixelFormats.Bgr24);
+                    DepthImage.Source = DebugImg2Helper.InteropBitmap;
+                }
+                DebugImg2Helper.UpdateBits(debugImg2.Bytes);
+            }
         }
 
+
+        #region helper methods
 
         private int TrackClosestSkeleton(Skeleton[] skeletons)
         {
@@ -338,7 +409,6 @@ namespace kinect_cv
 
                 return closestID;
             }
-
             return -1;
         }
 
@@ -369,5 +439,6 @@ namespace kinect_cv
             return bitmap;
         }
 
+        #endregion
     }
 }
