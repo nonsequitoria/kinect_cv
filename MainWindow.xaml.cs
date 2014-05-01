@@ -327,6 +327,35 @@ namespace KinectCV
                 displayImage = colourImage.Copy();
                 displayImage = displayImage.SmoothBlur(30, 30);
 
+                // get body depth
+                SkeletonPoint sposition = skeleton.Position;
+
+                // create a painting mask
+
+                Image<Gray, Byte> depth8 = depthImage.Convert<Gray, byte>();
+                depth8.SetValue(new Gray(0), playerMask.Not());
+                Image<Gray, Byte> paintMask = depth8.ThresholdBinaryInv(new Gray(128), new Gray(255));
+
+
+
+                //double v = sposition.Z * 1000;
+                //for (int y = 0; y < depthImage.Height; y++)
+                //    for (int x = 0; x < depthImage.Width; x++)
+                //    {
+                //        if (v == 0) continue;
+                //        if (depthImage.Data[y, x, 0] < v)
+                //            paintMask.Data[y, x, 0] = 255;
+                //    }
+
+                //Debug.Print(".");
+
+                debugImg1 = colourImage.Copy();
+                debugImg2 = depth8.Convert<Bgr, Byte>();
+
+                WriteDebugText(debugImg2, 10, 40,
+           String.Format("{0}", sposition.Z));
+
+                /*
                 // mask out the depth image for player mask
 
                 //depthImage.SetValue(new Gray(1500), playerMask.Not());
@@ -336,14 +365,12 @@ namespace KinectCV
                 debugImg1 = colourImage.Copy();
                 debugImg2 = depthImage.Convert<Bgr, Byte>();
 
-                // get body depth
-                SkeletonPoint sposition = skeleton.Position;
 
                 // get the left and right hand skeleton positions
                 SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
                 SkeletonPoint sright= skeleton.Joints[JointType.HandRight].Position;
 
-                // convert skeleton hand positions to depth image positions
+                // get depth pixel at skeleton hand positions
                 DepthImagePoint dleft = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sleft, sensor.DepthStream.Format);
                 DepthImagePoint dright = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sright, sensor.DepthStream.Format);
 
@@ -458,6 +485,9 @@ namespace KinectCV
                 // get the ROI around the skeleton hand position
 
                 //displayImage = colourImage;
+                 
+                 */
+              
 
             }
             else if (colourImage != null)
