@@ -102,7 +102,7 @@ namespace KinectCV
 
         // processing images
         Image<Bgr, byte> colourImage;
-        Image<Gray, Double> depthImage;
+        Image<Gray, float> depthImage;
         Image<Gray, byte> playerMask;
 
         // the actual image to display
@@ -112,6 +112,22 @@ namespace KinectCV
         public MainWindow()
         {
             InitializeComponent();
+
+            Random r = new Random();
+
+            Image<Gray, float> i = new Image<Gray, float>(200, 200);
+            // loop over each row and column of the depth
+            for (int y = 0; y < i.Height; y++)
+                for (int x = 0; x < i.Width; x++)
+                {
+                    i.Data[y, x, 0] = (float)r.NextDouble();
+                }
+            
+            Image<Gray, float> j = i.ThresholdBinary(new Gray(0.5), new Gray(1.0));
+            Image<Gray, double> ii = i.Convert<Gray, double>();
+            //Image<Gray, double> jj = ii.ThresholdBinary(new Gray(0.5), new Gray(1.0));
+
+
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -291,7 +307,9 @@ namespace KinectCV
                 byte byte_id = (byte)255;
 
                 // create Emgu depth and playerMask images
-                depthImage = new Image<Gray, Double>(sensor.DepthStream.FrameWidth, this.sensor.DepthStream.FrameHeight);
+                depthImage = new Image<Gray, float>(sensor.DepthStream.FrameWidth, this.sensor.DepthStream.FrameHeight);
+
+                int maxdepth = sensor.DepthStream.MaxDepth;
 
                 // loop over each row and column of the depth
                 for (int y = 0; y < this.depthHeight; y++)
@@ -301,7 +319,8 @@ namespace KinectCV
                         // calculate index into depth array
                         int depthIndex = x + (y * this.depthWidth);
                         DepthImagePixel depthPixel = this.depthPixels[depthIndex];
-                        depthImage.Data[y, x, 0] = depthPixel.Depth;
+
+                        depthImage.Data[y, x, 0] = (depthPixel.Depth < maxdepth) ? depthPixel.Depth : maxdepth;
                         
                          if  (depthPixel.PlayerIndex > 0)
                         {
@@ -309,6 +328,8 @@ namespace KinectCV
                         }
                     }
                 }
+
+                depthImage.Data[0, 0, 0] = sensor.DepthStream.MaxDepth;
 
                 playerMask = new Image<Gray, byte>(ToBitmap(playerPixelData,
                     sensor.DepthStream.FrameWidth, this.sensor.DepthStream.FrameHeight,
@@ -330,11 +351,16 @@ namespace KinectCV
                 // get body depth
                 SkeletonPoint sposition = skeleton.Position;
 
+                depthImage = depthImage.ThresholdToZeroInv(new Gray(1000));
+
+
+
+
                 // create a painting mask
 
-                Image<Gray, Byte> depth8 = depthImage.Convert<Gray, byte>();
-                depth8.SetValue(new Gray(0), playerMask.Not());
-                Image<Gray, Byte> paintMask = depth8.ThresholdBinaryInv(new Gray(128), new Gray(255));
+                //Image<Gray, Byte> depth8 = depthImage.Convert<Gray, byte>();
+                //depth8.SetValue(new Gray(0), playerMask.Not());
+                //Image<Gray, Byte> paintMask = depth8.ThresholdBinaryInv(new Gray(128), new Gray(255));
 
 
 
@@ -350,10 +376,10 @@ namespace KinectCV
                 //Debug.Print(".");
 
                 debugImg1 = colourImage.Copy();
-                debugImg2 = depth8.Convert<Bgr, Byte>();
 
-                WriteDebugText(debugImg2, 10, 40,
-           String.Format("{0}", sposition.Z));
+                debugImg2 = depthImage.Convert<Bgr, Byte>();
+
+
 
                 /*
                 // mask out the depth image for player mask
@@ -496,6 +522,13 @@ namespace KinectCV
 
                 debugImg1 = displayImage.Copy();
                 debugImg2 = depthImage.Convert<Bgr, Byte>();
+
+                double[] minvals;
+                double[] maxvals;
+                Point[] minpoints;
+                Point[] maxpoints;
+                depthImage.MinMax(out minvals, out maxvals, out minpoints, out maxpoints);
+                WriteDebugText(debugImg2, 10, 40, String.Format("{0}", maxvals[0]));
 
             }
             else
