@@ -197,7 +197,7 @@ namespace KinectCV
             }
 
             // Emgu window setup
-            //CvInvoke.cvNamedWindow(win1); //Create the window using the specific name
+            CvInvoke.cvNamedWindow(win1); //Create the window using the specific name
         }
 
 
@@ -218,7 +218,7 @@ namespace KinectCV
 
             // Emgu window shutdown
             //CvInvoke.cvWaitKey(0);  //Wait for the key pressing event
-            //CvInvoke.cvDestroyWindow(win1); //Destory the window
+            CvInvoke.cvDestroyWindow(win1); //Destory the window
         }
 
 
@@ -324,19 +324,17 @@ namespace KinectCV
             // 
             if (skeleton != null && colourImage != null && depthImage != null)
             {
-
                 displayImage = colourImage.Copy();
                 displayImage = displayImage.SmoothBlur(30, 30);
 
                 // mask out the depth image for player mask
-                //depthImage.SmoothMedian(5);
-                depthImage.SetValue(new Gray(2000), playerMask.Not());
 
-                Image<Gray, Byte> depthImage8 = depthImage.Convert<Gray, Byte>();
+                //depthImage.SetValue(new Gray(1500), playerMask.Not());
+                //Image<Gray, Byte> depthImage8 = depthImage.Convert<Gray, Byte>();
 
 
                 debugImg1 = colourImage.Copy();
-                debugImg2 = depthImage8.Convert<Bgr, Byte>();
+                debugImg2 = depthImage.Convert<Bgr, Byte>();
 
                 // get body depth
                 SkeletonPoint sposition = skeleton.Position;
@@ -360,15 +358,15 @@ namespace KinectCV
 
                 // left hand
                 MCvBox2D leftRoi = new MCvBox2D(dleft.ToPointF(), roi_size, 0);
-                Image<Gray, Byte> leftDepth = depthImage8.Copy(leftRoi);
+                Image<Gray, double> leftDepth = depthImage.Copy(leftRoi);
 
                 if (true || isLeftPainting)
                 {
                     //Image<Gray, Byte> leftDepth = leftDepth.Convert<Gray, Byte>();
 
-                    Image<Gray, Byte> mask = leftDepth.ThresholdBinaryInv(new Gray(5), new Gray(255));
+                    //Image<Gray, Byte> mask = leftDepth.ThresholdBinaryInv(new Gray(5), new Gray(255));
                     //mask = mask.Erode(5);
-                    leftDepth.SetValue(255, mask);
+                    //leftDepth.SetValue(255, mask);
 
                     //double[] minvals;
                     //double[] maxvals;
@@ -376,13 +374,14 @@ namespace KinectCV
                     //Point[] maxpoints;
                     //leftDepth.MinMax(out minvals, out maxvals, out minpoints, out maxpoints);
 
-                    double max = byte.MinValue;
-                    double min = byte.MaxValue;
+                    leftDepth = leftDepth.Dilate(5);
+
+                    double max = double.MinValue;
+                    double min = double.MaxValue;
                     for (int y = 0; y < leftDepth.Height; y++)
                         for (int x = 0; x < leftDepth.Width; x++)
                         {
-                            byte v = leftDepth.Data[y, x, 0];
-
+                            double v = leftDepth.Data[y, x, 0];
                             if (v == 0) continue;
                             if (v > max) max = v;
                             if (v < min) min = v;
@@ -391,22 +390,27 @@ namespace KinectCV
                     WriteDebugText(debugImg2, (int)leftRoi.center.X, (int)leftRoi.center.Y,
                             String.Format("{0:0} {1:0}",min, max));
 
-                    Image<Gray, Byte> leftBrush = leftDepth.Copy();
+                    Image<Gray, Byte> leftBrush = new Image<Gray, byte>(leftDepth.Width, leftDepth.Height);
 
-                    leftBrush = leftBrush.ThresholdBinaryInv(new Gray(min + 10), new Gray(255));
+                    //leftBrush = leftBrush.ThresholdBinaryInv(new Gray(min + 10), new Gray(255));
 
-                    //double vv = min + 10;
-                    //for (int y = 0; y < leftBrush.Height; y++)
-                    //    for (int x = 0; x < leftBrush.Width; x++)
-                    //    {
-                    //        if (leftBrush.Data[y, x, 0] > vv) leftBrush.Data[y, x, 0] = 0;
-                    //        else leftBrush.Data[y, x, 0] = 255;
-                    //    }
+                    double vv = min + 50;
+                    for (int y = 0; y < leftDepth.Height; y++)
+                        for (int x = 0; x < leftDepth.Width; x++)
+                        {
+                            if (leftDepth.Data[y, x, 0] > vv) leftBrush.Data[y, x, 0] = 0;
+                            else leftBrush.Data[y, x, 0] = 255;
+                        }
 
                     Rectangle leftWin = new Rectangle(10, 10, (int)roi_size.Width, (int)roi_size.Height);
                     debugImg1.ROI = leftWin;
-                    leftBrush.Convert<Bgr, Byte>().CopyTo(debugImg1);
+                    leftDepth.Convert<Bgr, Byte>().CopyTo(debugImg1);
                     debugImg1.ROI = Rectangle.Empty;
+
+
+                    Stamp(debugImg1, leftBrush.Convert<Bgr, Byte>(), 100, 10);
+
+                    CvInvoke.cvShowImage(win1, leftBrush);
 
                     //leftBrush.Convert<Gray, Byte>().ThresholdToZero(new Gray(100));
                     //leftDepth.ThresholdToZero(new Gray(min + 5));
@@ -418,7 +422,7 @@ namespace KinectCV
                 Image<Gray, Double> rightDepth = depthImage.Copy(rightRoi);
                
                 // draw the ROI for debug
-                //debugImg2.Draw(leftRoi, new Bgr(Color.Red), isLeftPainting ? 5 : 1);
+                debugImg2.Draw(leftRoi, new Bgr(Color.Red), isLeftPainting ? 5 : 1);
                 debugImg2.Draw(rightRoi, new Bgr(Color.Blue), isRightPainting ? 5 : 1);
 
                 // see if the hand ROI intersect
@@ -563,6 +567,14 @@ namespace KinectCV
         public static System.Drawing.Bitmap ToBitmap(byte[] pixels, int width, int height)
         {
             return ToBitmap(pixels, width, height, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+        }
+
+        void Stamp(Image<Bgr, Byte> img, Image<Bgr, Byte> stamp, int x, int y)
+        {
+            Rectangle a = new Rectangle(x, y, (int)stamp.Width, (int)stamp.Height);
+            img.ROI = a;
+            stamp.Convert<Bgr, Byte>().CopyTo(img);
+            img.ROI = Rectangle.Empty;
         }
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
