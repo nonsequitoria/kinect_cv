@@ -37,9 +37,23 @@ namespace KinectCV.Helpers
             return Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2));
         }
 
+        public static double Distance(SkeletonPoint a, SkeletonPoint b)
+        {
+            return Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2) + Math.Pow(a.Z - b.Z, 2));
+        }
+
         public static PointF MidPoint(PointF a, PointF b)
         {
             return new PointF(a.X + (b.X - a.X) / 2, a.Y + (b.Y - a.Y) / 2);
+        }
+
+        public static SkeletonPoint MidPoint(SkeletonPoint a, SkeletonPoint b)
+        {
+            SkeletonPoint sp = new SkeletonPoint();
+            sp.X = a.X + (b.X - a.X) / 2;
+            sp.Y = a.Y + (b.Y - a.Y) / 2;
+            sp.Z =  a.Z + (b.Z - a.Z) / 2;
+            return sp;
         }
     }
 }

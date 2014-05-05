@@ -98,12 +98,17 @@ namespace KinectCV
         private InteropBitmapHelper DebugImg2Helper = null;
         private InteropBitmapHelper DisplayImageHelper = null;
 
-        MCvFont debugFont = new MCvFont(FONT.CV_FONT_HERSHEY_PLAIN, 2.0, 2.0); 
+        MCvFont debugFont = new MCvFont(FONT.CV_FONT_HERSHEY_PLAIN, 1.5, 1.5); 
 
         // processing images
         Image<Bgr, byte> colourImage;
         Image<Gray, float> depthImage;
         Image<Gray, byte> playerMask;
+
+        // paint image
+        Image<Bgr, byte> brushImage;
+        Image<Gray, float> brushMask;
+        Image<Bgr, byte> paintingImage;
 
         // the actual image to display
         Image<Bgr, byte> displayImage;
@@ -113,19 +118,19 @@ namespace KinectCV
         {
             InitializeComponent();
 
-            Random r = new Random();
+            //Random r = new Random();
 
-            Image<Gray, float> i = new Image<Gray, float>(200, 200);
-            // loop over each row and column of the depth
-            for (int y = 0; y < i.Height; y++)
-                for (int x = 0; x < i.Width; x++)
-                {
-                    i.Data[y, x, 0] = (float)r.NextDouble();
-                }
+            //Image<Gray, float> i = new Image<Gray, float>(200, 200);
+            //// loop over each row and column of the depth
+            //for (int y = 0; y < i.Height; y++)
+            //    for (int x = 0; x < i.Width; x++)
+            //    {
+            //        i.Data[y, x, 0] = (float)r.NextDouble();
+            //    }
             
-            Image<Gray, float> j = i.ThresholdBinary(new Gray(0.5), new Gray(1.0));
-            Image<Gray, double> ii = i.Convert<Gray, double>();
-            //Image<Gray, double> jj = ii.ThresholdBinary(new Gray(0.5), new Gray(1.0));
+            //Image<Gray, float> j = i.ThresholdBinary(new Gray(0.5), new Gray(1.0));
+            //Image<Gray, double> ii = i.Convert<Gray, double>();
+            ////Image<Gray, double> jj = ii.ThresholdBinary(new Gray(0.5), new Gray(1.0));
 
 
         }
@@ -215,6 +220,7 @@ namespace KinectCV
             // Emgu window setup
             CvInvoke.cvNamedWindow(win1); //Create the window using the specific name
         }
+
 
 
         String win1 = "Emgu Window"; //The name of the window
@@ -340,46 +346,89 @@ namespace KinectCV
 
             #endregion
 
-            #region use the emgu images to do something
+            #region use the emgu images to do something interesting
             
             // 
             if (skeleton != null && colourImage != null && depthImage != null)
             {
-                displayImage = colourImage.Copy();
-                displayImage = displayImage.SmoothBlur(30, 30);
+                // display image has RGB background and  highlight the player who's in control
+                displayImage = colourImage.AddWeighted(playerMask.Resize(2, INTER.CV_INTER_NN).Convert<Bgr, byte>(), 0.7, 0.3, 0);
 
-                // get body depth
+                // blur it out
+                displayImage = displayImage.SmoothBlur(15, 15);
+
+                // get body depth (in m)
                 SkeletonPoint sposition = skeleton.Position;
 
-                depthImage = depthImage.ThresholdToZeroInv(new Gray(1000));
+                // mask out depth except playermask
+                depthImage.SetValue(new Gray(0), playerMask.Not());
+
+                brushMask = depthImage.Copy();
 
 
+                // create the brush
 
+                // hands become a brush when more that 350 mm closer to kinect
+                float brushThresh = (sposition.Z * 1000) - 350;
 
-                // create a painting mask
+                brushMask = brushMask.ThresholdToZeroInv(new Gray(brushThresh));
 
-                //Image<Gray, Byte> depth8 = depthImage.Convert<Gray, byte>();
-                //depth8.SetValue(new Gray(0), playerMask.Not());
-                //Image<Gray, Byte> paintMask = depth8.ThresholdBinaryInv(new Gray(128), new Gray(255));
+                if (brushImage == null) brushImage = new Image<Bgr, byte>(displayImage.Width, displayImage.Height);
 
+                brushImage.SetZero();
+                brushImage.SetValue(new Bgr(0, 0, 255), brushMask.Convert<Gray, byte>().Resize(2, INTER.CV_INTER_NN));
+                brushImage = brushImage.SmoothBlur(10, 10);
 
+                if (paintingImage == null) paintingImage = new Image<Bgr, byte>(displayImage.Width, displayImage.Height);
 
-                //double v = sposition.Z * 1000;
-                //for (int y = 0; y < depthImage.Height; y++)
-                //    for (int x = 0; x < depthImage.Width; x++)
-                //    {
-                //        if (v == 0) continue;
-                //        if (depthImage.Data[y, x, 0] < v)
-                //            paintMask.Data[y, x, 0] = 255;
-                //    }
+                paintingImage = paintingImage.Add(brushImage * 0.05);       
 
-                //Debug.Print(".");
-
-                debugImg1 = colourImage.Copy();
+                debugImg1 = paintingImage.Copy();
 
                 debugImg2 = depthImage.Convert<Bgr, Byte>();
 
+                displayImage = displayImage.AddWeighted(paintingImage, 0.5, 0.5, 0.0);
 
+
+                // get the left and right hand skeleton positions
+                SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
+                SkeletonPoint sright = skeleton.Joints[JointType.HandRight].Position;
+
+                double hand_distance = Helpers.Utilities.Distance(sleft, sright);
+
+
+                SkeletonPoint shands = Utilities.MidPoint(sleft, sright);
+
+                // get a ROI around the hands
+                float roi_diameter = 60;
+                System.Drawing.SizeF roi_size = new System.Drawing.SizeF(roi_diameter, roi_diameter);
+
+                DepthImagePoint dhands = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(shands, sensor.DepthStream.Format);
+                MCvBox2D handsRoi = new MCvBox2D(dhands.ToPointF(), roi_size, 0);
+                debugImg2.Draw(handsRoi, new Bgr(Color.Yellow), 1);
+
+
+                Image<Gray, float> handsImage = depthImage.Copy(handsRoi);
+
+                // set all the 
+                handsImage.SetValue(4000, handsImage.Convert<Gray, byte>().ThresholdBinaryInv(new Gray(5), new Gray(255)));
+
+                handsImage = handsImage.Erode(3).Dilate(3);
+//(int)handsRoi.GetVertices()[0].X, (int)handsRoi.GetVertices()[0].Y
+                Rectangle temp = new Rectangle(0,0, (int)roi_size.Width, (int)roi_size.Height);
+                debugImg2.ROI = temp;
+                handsImage.Convert<Bgr, Byte>().CopyTo(debugImg2);
+                debugImg2.ROI = Rectangle.Empty;
+
+
+                double[] minvals;
+                double[] maxvals;
+                Point[] minpoints;
+                Point[] maxpoints;
+                handsImage.MinMax(out minvals, out maxvals, out minpoints, out maxpoints);
+
+
+                WriteDebugText(debugImg2, 10, 200, String.Format("hd: {0:0.00} d {1}", hand_distance, minvals[0]));
 
                 /*
                 // mask out the depth image for player mask
@@ -392,9 +441,7 @@ namespace KinectCV
                 debugImg2 = depthImage.Convert<Bgr, Byte>();
 
 
-                // get the left and right hand skeleton positions
-                SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
-                SkeletonPoint sright= skeleton.Joints[JointType.HandRight].Position;
+
 
                 // get depth pixel at skeleton hand positions
                 DepthImagePoint dleft = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sleft, sensor.DepthStream.Format);
