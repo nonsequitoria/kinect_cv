@@ -41,6 +41,9 @@ namespace KinectCV
             InteropBitmap.Invalidate();
         }
 
+        public int Width { get { return _Width; } }
+        public int Height { get { return _Height; } }
+
         public InteropBitmap InteropBitmap { get; private set; }
         #endregion
 

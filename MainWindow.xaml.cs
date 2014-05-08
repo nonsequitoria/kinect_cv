@@ -162,6 +162,8 @@ namespace KinectCV
 
                 this.sensor.ColorStream.Enable(ColorFormat);
 
+
+
                 int colorWidth = this.sensor.ColorStream.FrameWidth;
                 int colorHeight = this.sensor.ColorStream.FrameHeight;
 
@@ -221,7 +223,7 @@ namespace KinectCV
             CvInvoke.cvNamedWindow(win1); //Create the window using the specific name
         }
 
-
+        Bgr brushColour = new Bgr(0, 0, 255);
 
         String win1 = "Emgu Window"; //The name of the window
 
@@ -342,16 +344,14 @@ namespace KinectCV
                 playerMask = new Image<Gray, byte>(ToBitmap(playerPixelData,
                     sensor.DepthStream.FrameWidth, this.sensor.DepthStream.FrameHeight,
                     System.Drawing.Imaging.PixelFormat.Format8bppIndexed));
-
-
-               
+  
             }
 
             #endregion
 
             #region use the emgu images to do something interesting
 
-            // 
+            // if we have a skeleton
             if (skeleton != null && colourImage != null && depthImage != null)
             {
                 // display image has RGB background and  highlight the player who's in control
@@ -365,40 +365,117 @@ namespace KinectCV
 
                 // get body depth (in m)
                 SkeletonPoint sposition = skeleton.Position;
+                // get the left and right hand  positions (m)
+                SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
+                SkeletonPoint sright = skeleton.Joints[JointType.HandRight].Position;
 
                 // mask out depth except playermask
-                depthImage.SetValue(new Gray(0), playerMask.Not());
+                Image<Gray, float> playerDepth = depthImage.Copy();
+                playerDepth.SetValue(new Gray(0), playerMask.Not());
 
-                brushMask = depthImage.Copy();
-
-
-                // create the brush
+                // painting
+                // - - - - - - - - - - - - -
 
                 // hands become a brush when more that 350 mm closer to kinect
                 float brushThresh = (sposition.Z * 1000) - 350;
 
+                brushMask = playerDepth.Copy();
                 brushMask = brushMask.ThresholdToZeroInv(new Gray(brushThresh));
 
                 if (brushImage == null) brushImage = new Image<Bgr, byte>(displayImage.Width, displayImage.Height);
 
                 brushImage.SetZero();
-                brushImage.SetValue(new Bgr(0, 0, 255), brushMask.Convert<Gray, byte>().Resize(2, INTER.CV_INTER_NN));
+                brushImage.SetValue(brushColour, brushMask.Convert<Gray, byte>().Resize(2, INTER.CV_INTER_NN));
                 brushImage = brushImage.SmoothBlur(10, 10);
 
                 if (paintingImage == null) paintingImage = new Image<Bgr, byte>(displayImage.Width, displayImage.Height);
 
                 paintingImage = paintingImage.Add(brushImage * 0.05);
 
-                debugImg1 = paintingImage.Copy();
 
                 debugImg2 = depthImage.Convert<Bgr, Byte>();
-
                 displayImage = displayImage.AddWeighted(paintingImage, 0.5, 0.5, 0.0);
 
 
-                // get the left and right hand skeleton positions
-                SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
-                SkeletonPoint sright = skeleton.Joints[JointType.HandRight].Position;
+                // erase all 
+                // - - - - - - - - - - - - -
+
+                // raising both hands over head erases
+
+
+
+                // colour picker
+                // - - - - - - - - - - - - -
+
+                // hands become a brush when more that 350 mm closer to kinect
+                float pickerThresh = (sposition.Z * 1000) - 100;
+
+                Image<Gray, float> pickerImage = playerDepth.ThresholdToZeroInv(new Gray(pickerThresh));
+                pickerImage = pickerImage.Dilate(2).Erode(2);
+
+                debugImg1 = pickerImage.Convert<Bgr, byte>();
+
+                // get the contours
+            Contour<Point> contours = null;
+
+            Image<Gray, byte> pickerImageByte = pickerImage.Convert<Gray, byte>();
+
+            PointF pickerPoint = PointF.Empty;
+
+            for (contours = pickerImageByte.FindContours(CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE,
+                                                            RETR_TYPE.CV_RETR_CCOMP);
+                    contours != null;
+                    contours = contours.HNext)
+            {
+
+                // take the first large contour
+                Contour<Point> hole = contours.VNext;
+                if (hole != null && hole.Area > 100)
+                {
+                    debugImg1.Draw(hole, new Bgr(0, 0, 255), 2);
+                    MCvMoments moments = hole.GetMoments();
+                    MCvPoint2D64f p = moments.GravityCenter;
+
+                    pickerPoint = new PointF((float)p.x, (float)p.y);
+                }
+                else
+                {
+
+                }
+            }
+
+            if (pickerPoint != PointF.Empty)
+            {
+
+                DepthImagePoint dp = new DepthImagePoint();
+                dp.X = (int)pickerPoint.X;
+                dp.Y = (int)pickerPoint.Y;
+                dp.Depth = (int)depthImage[dp.Y, dp.X].Intensity;
+                ColorImagePoint cp = sensor.CoordinateMapper.MapDepthPointToColorPoint(sensor.DepthStream.Format, dp, sensor.ColorStream.Format);
+
+                if (cp.X > 0 && cp.X < colourImage.Width && cp.Y > 0 && cp.Y < colourImage.Height)
+                {
+
+                    Bgr c = colourImage[cp.Y, cp.X];
+                    double hue, sat, val;
+                    Color cc = Color.FromArgb((int)c.Red, (int)c.Green, (int)c.Blue);
+                    ColorToHSV(cc, out hue, out sat, out val);
+                    sat = 1.0; 
+                    
+                    val = 1.0;
+                    cc = HSVToColor(hue, sat, val);
+                    debugImg1.Draw(new Cross2DF(pickerPoint, 50, 50), new Bgr(cc), 3);
+                    WriteDebugText(debugImg1, (int)pickerPoint.X, (int)pickerPoint.Y, String.Format("{0},{1},{2}", hue, sat, val));
+                    brushColour = new Bgr(cc);
+                
+                }
+            
+            }
+       
+
+
+                
+
 
                 double hand_distance = Helpers.Utilities.Distance(sleft, sright);
 
@@ -618,7 +695,7 @@ namespace KinectCV
                 String debugMsg = String.Format("{0} Sk: {1}", colorFrameNum, id);
                 debugImg1.Draw(debugMsg, ref debugFont, new System.Drawing.Point(10, 30), new Bgr(255, 255, 255));
 
-                if (DebugImg1Helper == null)
+                if (DebugImg1Helper == null || DebugImg1Helper.Width != debugImg1.Width)
                 {
                     DebugImg1Helper = new InteropBitmapHelper(debugImg1.Width, debugImg1.Height, debugImg1.Bytes, PixelFormats.Bgr24);
                     MaskedColor.Source = DebugImg1Helper.InteropBitmap;
@@ -630,7 +707,7 @@ namespace KinectCV
 
             if (debugImg2 != null)
             {
-                if (DebugImg2Helper == null)
+                if (DebugImg2Helper == null || DebugImg2Helper.Width != debugImg2.Width)
                 {
                     DebugImg2Helper = new InteropBitmapHelper(debugImg2.Width, debugImg2.Height, debugImg2.Bytes, PixelFormats.Bgr24);
                     DepthImage.Source = DebugImg2Helper.InteropBitmap;
@@ -641,6 +718,42 @@ namespace KinectCV
 
 
         #region helper methods
+
+
+        public static void ColorToHSV(Color color, out double hue, out double saturation, out double value)
+        {
+            int max = Math.Max(color.R, Math.Max(color.G, color.B));
+            int min = Math.Min(color.R, Math.Min(color.G, color.B));
+
+            hue = color.GetHue();
+            saturation = (max == 0) ? 0 : 1d - (1d * min / max);
+            value = max / 255d;
+        }
+
+        public static Color HSVToColor(double hue, double saturation, double value)
+        {
+            int hi = Convert.ToInt32(Math.Floor(hue / 60)) % 6;
+            double f = hue / 60 - Math.Floor(hue / 60);
+
+            value = value * 255;
+            int v = Convert.ToInt32(value);
+            int p = Convert.ToInt32(value * (1 - saturation));
+            int q = Convert.ToInt32(value * (1 - f * saturation));
+            int t = Convert.ToInt32(value * (1 - (1 - f) * saturation));
+
+            if (hi == 0)
+                return Color.FromArgb(255, v, t, p);
+            else if (hi == 1)
+                return Color.FromArgb(255, q, v, p);
+            else if (hi == 2)
+                return Color.FromArgb(255, p, v, t);
+            else if (hi == 3)
+                return Color.FromArgb(255, p, q, v);
+            else if (hi == 4)
+                return Color.FromArgb(255, t, p, v);
+            else
+                return Color.FromArgb(255, v, p, q);
+        }
 
         public static Matrix<double> ComputeDepthToRGBHomography(Image<Gray, byte> depth, KinectSensor sensor)
         {
