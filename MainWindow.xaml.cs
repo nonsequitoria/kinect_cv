@@ -98,7 +98,7 @@ namespace KinectCV
         private InteropBitmapHelper DebugImg2Helper = null;
         private InteropBitmapHelper DisplayImageHelper = null;
 
-        MCvFont debugFont = new MCvFont(FONT.CV_FONT_HERSHEY_PLAIN, 1.5, 1.5); 
+        MCvFont debugFont = new MCvFont(FONT.CV_FONT_HERSHEY_PLAIN, 1.5, 1.5);
 
         // processing images
         Image<Bgr, byte> colourImage;
@@ -127,7 +127,7 @@ namespace KinectCV
             //    {
             //        i.Data[y, x, 0] = (float)r.NextDouble();
             //    }
-            
+
             //Image<Gray, float> j = i.ThresholdBinary(new Gray(0.5), new Gray(1.0));
             //Image<Gray, double> ii = i.Convert<Gray, double>();
             ////Image<Gray, double> jj = ii.ThresholdBinary(new Gray(0.5), new Gray(1.0));
@@ -263,6 +263,7 @@ namespace KinectCV
                 {
                     // Copy the pixel data from the image to a temporary array
                     depthFrame.CopyDepthImagePixelDataTo(this.depthPixels);
+
                     depthReceived = true;
                 }
             }
@@ -290,6 +291,7 @@ namespace KinectCV
                     skeletonFrame.CopySkeletonDataTo(skeletons);
                 }
             }
+
 
             // pick which skeleton to track
             int id = TrackClosestSkeleton(skeletons);
@@ -327,8 +329,8 @@ namespace KinectCV
                         DepthImagePixel depthPixel = this.depthPixels[depthIndex];
 
                         depthImage.Data[y, x, 0] = (depthPixel.Depth < maxdepth) ? depthPixel.Depth : maxdepth;
-                        
-                         if  (depthPixel.PlayerIndex > 0)
+
+                        if (depthPixel.PlayerIndex > 0)
                         {
                             playerPixelData[depthIndex] = byte_id;
                         }
@@ -341,17 +343,21 @@ namespace KinectCV
                     sensor.DepthStream.FrameWidth, this.sensor.DepthStream.FrameHeight,
                     System.Drawing.Imaging.PixelFormat.Format8bppIndexed));
 
-   
+
+               
             }
 
             #endregion
 
             #region use the emgu images to do something interesting
-            
+
             // 
             if (skeleton != null && colourImage != null && depthImage != null)
             {
                 // display image has RGB background and  highlight the player who's in control
+
+                //Matrix<double> h = ComputeDepthToRGBHomography(depthImage.Convert<Gray, byte>(), sensor);
+                //Image<Gray, byte> registeredplayerMask = playerMask.WarpPerspective(h, INTER.CV_INTER_CUBIC, WARP.CV_WARP_DEFAULT, new Gray(0));
                 displayImage = colourImage.AddWeighted(playerMask.Resize(2, INTER.CV_INTER_NN).Convert<Bgr, byte>(), 0.7, 0.3, 0);
 
                 // blur it out
@@ -381,7 +387,7 @@ namespace KinectCV
 
                 if (paintingImage == null) paintingImage = new Image<Bgr, byte>(displayImage.Width, displayImage.Height);
 
-                paintingImage = paintingImage.Add(brushImage * 0.05);       
+                paintingImage = paintingImage.Add(brushImage * 0.05);
 
                 debugImg1 = paintingImage.Copy();
 
@@ -414,8 +420,8 @@ namespace KinectCV
                 handsImage.SetValue(4000, handsImage.Convert<Gray, byte>().ThresholdBinaryInv(new Gray(5), new Gray(255)));
 
                 handsImage = handsImage.Erode(3).Dilate(3);
-//(int)handsRoi.GetVertices()[0].X, (int)handsRoi.GetVertices()[0].Y
-                Rectangle temp = new Rectangle(0,0, (int)roi_size.Width, (int)roi_size.Height);
+                //(int)handsRoi.GetVertices()[0].X, (int)handsRoi.GetVertices()[0].Y
+                Rectangle temp = new Rectangle(0, 0, (int)roi_size.Width, (int)roi_size.Height);
                 debugImg2.ROI = temp;
                 handsImage.Convert<Bgr, Byte>().CopyTo(debugImg2);
                 debugImg2.ROI = Rectangle.Empty;
@@ -560,7 +566,7 @@ namespace KinectCV
                 //displayImage = colourImage;
                  
                  */
-              
+
 
             }
             else if (colourImage != null)
@@ -636,6 +642,82 @@ namespace KinectCV
 
         #region helper methods
 
+        public static Matrix<double> ComputeDepthToRGBHomography(Image<Gray, byte> depth, KinectSensor sensor)
+        {
+           // grid size
+            int width = depth.Width;
+            int height = depth.Height;
+
+            // grid size to sample from
+            int numX = 4;
+            int numY = 4;
+
+            // margin on outside to skip
+            int margin = 20;
+
+            int strideX = (width - 2 * margin) / numX;
+            int strideY = (height - 2 * margin) / numY;
+
+           // ImageViewArea viewArea = new ImageViewArea();
+
+            double[,] sourcePts = new double[numX * numY, 2];
+
+            for (int i = 0; i < numX; i++)
+                for (int j = 0; j < numY; j++)
+                {
+                    sourcePts[(i * numX) + j, 0] = margin + (i * strideX);
+                    sourcePts[(i * numX) + j, 1] = margin + (j * strideY);
+                }
+
+            double[,] destPts = new double[sourcePts.GetLength(0), 2];
+
+            double ratio = sensor.ColorStream.FrameWidth / (double)sensor.DepthStream.FrameWidth;
+
+            for (int i = 0; i < sourcePts.GetLength(0); i++)
+            {
+                DepthImagePoint dp = new DepthImagePoint();
+                dp.X = (int)sourcePts[i, 0];
+                dp.Y = (int)sourcePts[i, 1];
+                dp.Depth = (int)depth[dp.X, dp.Y].Intensity;
+
+                //int index = (y * width + x) * 2;
+                //int player = depth[index] & 7;
+                //short depthValue = (short)(depth[index] | (depth[index + 1] << 8));
+
+
+
+                //int cx, cy;
+
+                ColorImagePoint cp = sensor.CoordinateMapper.MapDepthPointToColorPoint(sensor.DepthStream.Format, dp, sensor.ColorStream.Format);
+                
+                //mKinect.NuiCamera.GetColorPixelCoordinatesFromDepthPixel(ImageResolution.Resolution640x480, viewArea, x, y, depthValue, out cx, out cy);
+                destPts[i, 0] = cp.X / ratio;
+                destPts[i, 1] = cp.Y / ratio;
+
+            }
+
+            Matrix<double> srcpm = new Matrix<double>(sourcePts);
+            Matrix<double> dstpm = new Matrix<double>(destPts);
+            Matrix<double> homogm = new Matrix<double>(3, 3, 1);
+
+            //dest.SetValue(new Bgr(255, 255, 255));
+
+ 
+            CvInvoke.cvFindHomography(srcpm.Ptr, dstpm.Ptr, homogm, HOMOGRAPHY_METHOD.DEFAULT, 3, IntPtr.Zero);
+            
+            //CvInvoke.cvWarpPerspective(depth.Ptr, registeredDepth, homogm.Ptr, 0, new MCvScalar(255));
+
+
+            //Image<Gray, Byte> dest2 = new Image<Gray, Byte>(mPlayerMasksImage.Width, mPlayerMasksImage.Height);
+            //CvInvoke.cvWarpPerspective(mPlayerMasksImage.Ptr, dest2, homogm.Ptr, 0, new MCvScalar(255, 255, 255));
+            //mPlayerMasksImage = dest2;
+
+
+
+
+            return homogm;
+        }
+
         private int TrackClosestSkeleton(Skeleton[] skeletons)
         {
             if (this.sensor != null && this.sensor.SkeletonStream != null)
@@ -666,13 +748,13 @@ namespace KinectCV
             }
             return -1;
         }
-            
-            
+
+
         public void WriteDebugText(Image<Bgr, Byte> img, int x, int y, string text, params object[] args)
         {
-            img.Draw(String.Format(text, args), ref debugFont, new Point(x,y), new Bgr(255, 255, 255));
+            img.Draw(String.Format(text, args), ref debugFont, new Point(x, y), new Bgr(255, 255, 255));
         }
-            
+
 
         public static System.Drawing.Bitmap ToBitmap(byte[] pixels, int width, int height)
         {
