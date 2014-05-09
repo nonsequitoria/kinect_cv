@@ -28,6 +28,11 @@ namespace KinectCV.Helpers
             return new PointF(p.X, p.Y);
         }
 
+        public static PointF ToPointF(this ColorImagePoint p)
+        {
+            return new PointF(p.X, p.Y);
+        }
+
     }
 
     public class Utilities

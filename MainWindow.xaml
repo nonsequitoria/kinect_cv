@@ -1,7 +1,7 @@
 ﻿<Window x:Class="KinectCV.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="kinect_cv" Height="688" Width="412"
+        Title="kinect_cv" Width="640" Height="480" 
         Loaded="Window_Loaded" Closing="Window_Closing"
         >
     <Grid>
@@ -13,11 +13,9 @@
                 <TextBlock Name="statusBarText" Margin="-1 0 0 0"></TextBlock>
             </StatusBarItem>
         </StatusBar>
-            <StackPanel Orientation="Vertical" Background="Black">
-                <Image Name ="MaskedColor"/>
-                <Image Name ="DepthImage"/>
-            </StackPanel>
-
+            <Grid Background="Black">
+                <Image Name ="DisplayImage"/>
+            </Grid>
         </DockPanel>
     </Grid>
 </Window>
