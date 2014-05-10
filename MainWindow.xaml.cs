@@ -105,6 +105,8 @@ namespace KinectCV
 
             if (null != this.sensor)
             {
+
+
                 // Turn on the depth stream to receive depth frames
                 this.sensor.DepthStream.Enable(DepthFormat);
 
@@ -112,6 +114,7 @@ namespace KinectCV
 
                 // Turn on to get player masks
                 this.sensor.SkeletonStream.Enable();
+                this.sensor.SkeletonStream.TrackingMode = SkeletonTrackingMode.Seated;
 
                 // Allocate space to put the depth pixels we'll receive
                 this.depthPixels = new DepthImagePixel[this.sensor.DepthStream.FramePixelDataLength];
@@ -147,6 +150,9 @@ namespace KinectCV
             else
             {
                 statusBarText.Text = String.Format("{0}", sensor.UniqueKinectId);
+
+                // tilt if necessary
+                this.sensor.ElevationAngle = 10;
             }
         }
 
@@ -249,12 +255,11 @@ namespace KinectCV
                         i = x + (y * depthW);
                         DepthImagePixel depthPixel = this.depthPixels[i];
 
+                        // save pixel to images
                         depthImage.Data[y, x, 0] = (depthPixel.Depth < maxdepth) ? depthPixel.Depth : maxdepth;
                         playerMasks.Data[y, x, 0] = (byte)depthPixel.PlayerIndex;
 
                         //playerPixelData[i] = (byte)depthPixel.PlayerIndex;
-                        //if (depthPixel.PlayerIndex > maxplayerindex)
-                        //    maxplayerindex = depthPixel.PlayerIndex;
 
                     }
                 }
@@ -263,14 +268,13 @@ namespace KinectCV
                 // converting float image to byte or Bgr
                 depthImage.Data[0, 0, 0] = sensor.DepthStream.MaxDepth;
 
+                // should work, but causes grey values to be pseudo randomly transposed
                 //playerMasks = new Image<Gray, byte>(ToBitmap(playerPixelData,
                 //    sensor.DepthStream.FrameWidth, this.sensor.DepthStream.FrameHeight,
                 //    System.Drawing.Imaging.PixelFormat.Format8bppIndexed));
             }
 
-            double[] min, max;
-            Point[] pmin, pmax;
-            playerMasks.MinMax(out min, out max, out pmin, out pmax);
+
 
             #endregion
 
@@ -296,6 +300,9 @@ namespace KinectCV
 
                 //playerMask = playerMasks.ThresholdToZero(new Gray(9));
 
+                //double[] min, max;
+                //Point[] pmin, pmax;
+                //playerMasks.MinMax(out min, out max, out pmin, out pmax);
 
 
                 Image<Gray, Byte> playerMask = playerMasks.Convert(delegate(Byte b) { return (Byte)(b == playerIndex ? 255 : 0); });
@@ -336,8 +343,8 @@ namespace KinectCV
                 // paint with hands
                 // - - - - - - - - - - - - -
 
-                // hands become a brush or eraser when more that 300 mm closer to kinect
-                float brushThresh = (sposition.Z * 1000) - 300;
+                // hands become a brush or eraser when more that 250 mm closer to kinect
+                float brushThresh = (sposition.Z * 1000) - 250;
 
                 brushMask = playerDepth.Copy();
                 brushMask = brushMask.ThresholdToZeroInv(new Gray(brushThresh));
@@ -363,7 +370,7 @@ namespace KinectCV
                     debugImg2.Draw(new CircleF(dp.ToPointF(), 20), new Bgr(Color.LightGreen), 1);
                     dp = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(shead, sensor.DepthStream.Format);
                     debugImg2.Draw(new CircleF(dp.ToPointF(), 20), new Bgr(Color.Cyan), 1);
-                    Utilities.WriteDebugText(debugImg2, 10, 40, "Player: {0} {1} {2}", playerId, playerIndex, max[0]);
+                    Utilities.WriteDebugText(debugImg2, 10, 40, "Player: {0} {1}", playerId, playerIndex);
                 }
 
 
@@ -438,7 +445,9 @@ namespace KinectCV
                         sat = Math.Min(sat * 2, 1);
                         val = Math.Min(val * 2, 1);
                         cc = Utilities.HSVToColor(hue, sat, val);
-                        displayImage.Draw(new CircleF(new PointF(cp.X, cp.Y), 10), new Bgr(cc), -1);
+                        CircleF circle = new CircleF(new PointF(cp.X, cp.Y), 10);
+                        displayImage.Draw(circle, new Bgr(cc), -1);
+                        displayImage.Draw(circle, new Bgr(255,255,255), 1);
                         //WriteDebugText(debugImg1, (int)pickerPoint.X, (int)pickerPoint.Y, String.Format("{0},{1},{2}", hue, sat, val));
                         brushColour = new Bgr(cc);
                     }
@@ -446,7 +455,7 @@ namespace KinectCV
 
             }
             // waiting for skeleton
-            else if (colourImage != null)
+            else if (colourImage != null && depthImage != null)
             {
                 displayImage = colourImage.Copy();
                 debugImg1 = displayImage.Copy();
