@@ -35,9 +35,9 @@ Test the Kinect by running:
 
 ## Compiling and Running the Code for the First Time
 
-1. Set the reference path to your Emgu installation.
+1. You may need to set the reference path to your Emgu installation: Add "C:\Emgu\emgucv-windows-universal-cuda 2.9.0.1922\bin\" to "Project Properties"/"Reference Paths".
 2. Compile the solution.
-3. Before running, go to "C:\Emgu\emgucv-windows-universal-cuda 2.9.0.1922\bin\" and copy the "\x64" and "\x86" subdirectories containing all the OpenCV DLLs to the "Debug\" subdirectory of the kinect_cv project. Do the same for "Release\" if you want to compile release code.
+3. Before running, go to "C:\Emgu\emgucv-windows-universal-cuda 2.9.0.1922\bin\" and copy the "\x64" and "\x86" subdirectories containing all the OpenCV DLLs (~1Gb) to the "Debug\" subdirectory of the kinect_cv project. Do the same for "Release\" if you want to compile release code.
 
 **Crash on start with exceptions shown below? Make sure you copied the OpenCV DLL directories in step 3.**
 
