@@ -40,3 +40,6 @@ Test the Kinect by running:
 3. Before running, copy the "\x64" and "\x86" subdirectories of "C:\Emgu\emgucv-windows-universal-cuda 2.9.0.1922\bin\" to the "Debug\" subdirectory of kinect cv.
 
 
+## Contact
+
+Question? Bugs? Contact me.
