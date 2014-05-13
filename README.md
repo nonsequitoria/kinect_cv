@@ -1,9 +1,6 @@
-kinect_cv
-=========
+#kinect_cv: Kinect Image Processing Demo for GRAND 2014 Kinect Workshop
 
-Kinect Image Processing Demo for GRAND 2014 Kinect Workshop
-
-Dmeonstrates how to use the official Microsoft Kinect SDK and Emgu CV to perform real time image processing in C#.
+Demonstrates how to use the Kinect for Windows SDK and Emgu CV for real time image processing leveraging skeleton positions in C#.
 
 ## Requirements
 
