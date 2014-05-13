@@ -76,6 +76,19 @@ namespace KinectCV
         // helper to convert EMGU image to WPF Image Source
         private InteropBitmapHelper DisplayImageHelper = null;
 
+
+
+        public bool ShowDebug
+        {
+            get { return (bool)GetValue(ShowDebugProperty); }
+            set { SetValue(ShowDebugProperty, value); }
+        }
+
+        public static readonly DependencyProperty ShowDebugProperty =
+            DependencyProperty.Register("ShowDebug", typeof(bool), typeof(MainWindow));
+
+        
+
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
         public MainWindow()
@@ -163,8 +176,6 @@ namespace KinectCV
         }
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-
-        bool showDebug = false;
 
         private void SensorAllFramesReady(object sender, AllFramesReadyEventArgs e)
         {
@@ -342,7 +353,7 @@ namespace KinectCV
                 displayImage = displayImage.AddWeighted(paintingImage, 0.5, 0.5, 0.0);
 
                 // show debug
-                if (showDebug)
+                if (ShowDebug)
                 {
                     debugImg2 = depthImage.Convert<Bgr, Byte>();
                     DepthImagePoint dp;
@@ -383,7 +394,7 @@ namespace KinectCV
                 // clean up small pixels and noise with morpholigical operations
                 pickerImage = pickerImage.Dilate(2).Erode(2);
 
-                if (showDebug)
+                if (ShowDebug)
                 {
                     debugImg1 = new Image<Bgr, byte>(pickerImage.Width, pickerImage.Height);
                     debugImg1.SetValue(new Bgr(Color.Yellow), pickerImage.Convert<Gray, Byte>());
@@ -412,7 +423,7 @@ namespace KinectCV
                     Contour<Point> hole = contours.VNext;
                     if (hole != null && hole.Area > 50)
                     {
-                        if (showDebug)
+                        if (ShowDebug)
                             debugImg1.Draw(hole, new Bgr(0, 0, 255), 2);
 
                         // get the centre of the hole
@@ -466,7 +477,7 @@ namespace KinectCV
             {
                 displayImage = colourImage.Copy();
 
-                if (showDebug)
+                if (ShowDebug)
                 {
                     debugImg1 = displayImage.Copy();
                     debugImg2 = depthImage.Convert<Bgr, Byte>();
@@ -498,7 +509,7 @@ namespace KinectCV
             }
 
             // display Emgu debug images
-            if (showDebug)
+            if (ShowDebug)
             {
                 CvInvoke.cvShowImage("debugImg1", debugImg1);
                 CvInvoke.cvShowImage("debugImg2", debugImg2);

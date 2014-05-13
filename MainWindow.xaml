@@ -3,16 +3,21 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="kinect_cv" Width="640" Height="480" 
         Loaded="Window_Loaded" Closing="Window_Closing"
+        Name="win"
         >
     <Grid>
 
         <DockPanel>
             
         <StatusBar DockPanel.Dock="Bottom" HorizontalAlignment="Stretch" Name="statusBar" VerticalAlignment="Bottom" >
-            <StatusBarItem Padding="0 0 0 10">
-                <TextBlock Name="statusBarText" Margin="-1 0 0 0"></TextBlock>
-            </StatusBarItem>
-        </StatusBar>
+            <StatusBarItem Padding="0 0 0 0">
+                <TextBlock Name="statusBarText"></TextBlock>
+                </StatusBarItem>
+                 <StatusBarItem Padding="50 0 0 0">
+                   <CheckBox IsChecked="{Binding ElementName=win, Path=ShowDebug}"> Show Debug </CheckBox>
+              
+                    </StatusBarItem> 
+            </StatusBar>
             <Grid Background="Black">
                 <Image Name ="DisplayImage"/>
             </Grid>
