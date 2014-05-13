@@ -2,6 +2,9 @@
 
 Demonstrates how to use the Kinect for Windows SDK and Emgu CV for real time image processing leveraging skeleton positions in C#.
 
+![ScreenShot](kinect_cv.png)
+
+
 ## Requirements
 
 * Windows 7+ (tested on Windows 7 and 8.1)
