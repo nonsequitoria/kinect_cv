@@ -37,8 +37,19 @@ Test the Kinect by running:
 
 1. Set the reference path to your Emgu installation.
 2. Compile the solution.
-3. Before running, copy the "\x64" and "\x86" subdirectories of "C:\Emgu\emgucv-windows-universal-cuda 2.9.0.1922\bin\" to the "Debug\" subdirectory of kinect cv.
+3. Before running, go to "C:\Emgu\emgucv-windows-universal-cuda 2.9.0.1922\bin\" and copy the "\x64" and "\x86" subdirectories containing all the OpenCV DLLs to the "Debug\" subdirectory of the kinect_cv project. Do the same for "Release\" if you want to compile release code.
 
+**Crash on start with exceptions shown below? Make sure you copied the OpenCV DLL directories in step 3.**
+
+```
+A first chance exception of type 'System.ArgumentException' occurred in mscorlib.dll
+A first chance exception of type 'System.DllNotFoundException' occurred in Emgu.CV.dll
+A first chance exception of type 'System.TypeInitializationException' occurred in Emgu.CV.dll
+```
+
+## Understanding the Demo
+
+Comments in the code and discussion at the workshop.
 
 ## Contact
 
