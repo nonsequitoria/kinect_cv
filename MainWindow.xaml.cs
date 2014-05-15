@@ -87,7 +87,7 @@ namespace KinectCV
         public static readonly DependencyProperty ShowDebugProperty =
             DependencyProperty.Register("ShowDebug", typeof(bool), typeof(MainWindow));
 
-        
+
 
         // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
@@ -280,8 +280,58 @@ namespace KinectCV
 
             #region use the emgu images to do something interesting
 
-            // if we have a skeleton
-            if (skeleton != null && colourImage != null && depthImage != null)
+            int demo = 1;
+
+
+            // DEMO 0: You
+            if (demo == 0 && skeleton != null && colourImage != null && depthImage != null)
+            {
+
+
+                displayImage = colourImage.Copy();
+
+                if (ShowDebug)
+                {
+
+                }
+            }
+
+            // DEMO 1: blur and boost
+            else if (demo == 1 && skeleton != null && colourImage != null && depthImage != null)
+            {
+                SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
+                SkeletonPoint sright = skeleton.Joints[JointType.HandRight].Position;
+                double hand_x_dist = Math.Abs(sleft.X - sright.Y);
+                double hand_y_dist = Math.Abs(sleft.Y - sright.Y);
+
+                displayImage = colourImage.Resize(0.5, INTER.CV_INTER_NN); // scale by 2 to speed up
+                // displayImage = colourImage.Copy(); // slower
+
+                // boost the RGB values based on vertical hand distance 
+                float boost = 3 - (float)(hand_y_dist * 5);
+                displayImage = colourImage.Convert(delegate(Byte b) { return (byte)((b * boost < 255) ? (b * boost) : 255); });
+
+                // blur based on horizontal hand distance
+                int blur = (int)(hand_x_dist * 20);
+                if (blur > 0)
+                    displayImage = displayImage.SmoothBlur(blur, blur);
+
+                // show debug
+                if (ShowDebug)
+                {
+                    debugImg2 = depthImage.Convert<Bgr, Byte>();
+                    DepthImagePoint dp;
+                    dp = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sleft, sensor.DepthStream.Format);
+                    debugImg2.Draw(new CircleF(dp.ToPointF(), 20), new Bgr(Color.Coral), 1);
+                    dp = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sright, sensor.DepthStream.Format);
+                    debugImg2.Draw(new CircleF(dp.ToPointF(), 20), new Bgr(Color.LightGreen), 1);
+                    Utilities.WriteDebugText(debugImg2, 10, 40, "{0:.00}m {1:0.00}m", hand_x_dist, hand_y_dist);
+                }
+
+            }
+
+            // DEMO 2: Painting 
+            else if (demo == 2 && skeleton != null && colourImage != null && depthImage != null)
             {
                 // create a player mask for player we want
                 byte playerIndex = (byte)(Array.IndexOf(skeletons, skeleton) + 1);
@@ -322,6 +372,19 @@ namespace KinectCV
                 // mask out depth except playermask
                 Image<Gray, float> playerDepth = depthImage.Copy();
                 playerDepth.SetValue(new Gray(0), playerMask.Not());
+
+                // erase all interaction
+                // - - - - - - - - - - - - -
+                // raising both hands over head, when hands are close together, erases
+
+                // get the distance between the hands
+                double hand_distance = Utilities.Distance(sleft, sright);
+
+                // if hands closer than 30cm and over head, then erase
+                if (hand_distance < 0.3 && sleft.Y > shead.Y && sright.Y > shead.Y)
+                {
+                    paintingImage.SetZero();
+                }
 
                 // paint with hands interaction
                 // - - - - - - - - - - - - -
@@ -367,18 +430,7 @@ namespace KinectCV
 
                 }
 
-                // erase all interaction
-                // - - - - - - - - - - - - -
-                // raising both hands over head, when hands are close together, erases
 
-                // get the distance between the hands
-                double hand_distance = Utilities.Distance(sleft, sright);
-
-                // if hands closer than 30cm and over head, then erase
-                if (hand_distance < 0.3 && sleft.Y > shead.Y && sright.Y > shead.Y)
-                {
-                    paintingImage.SetZero();
-                }
 
                 // colour picker interaction
                 // - - - - - - - - - - - - -
