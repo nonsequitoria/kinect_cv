@@ -126,13 +126,16 @@ namespace KinectCV
                 this.sensor.SkeletonStream.TrackingMode = SkeletonTrackingMode.Seated;
 
                 // Allocate space to put the depth pixels we'll receive
-                this.depthPixels = new DepthImagePixel[this.sensor.DepthStream.FramePixelDataLength];
+                this.depthPixels = 
+                    new DepthImagePixel[this.sensor.DepthStream.FramePixelDataLength];
 
                 // Allocate space to put the color pixels we'll create
                 this.colorPixels = new byte[this.sensor.ColorStream.FramePixelDataLength];
 
                 // output image
-                displayImage = new Image<Bgr, byte>(sensor.ColorStream.FrameWidth, sensor.ColorStream.FrameHeight);
+                displayImage = 
+                    new Image<Bgr, byte>(sensor.ColorStream.FrameWidth, 
+                        sensor.ColorStream.FrameHeight);
 
                 // event handler when frames are ready
                 this.sensor.AllFramesReady += this.SensorAllFramesReady;
@@ -158,7 +161,7 @@ namespace KinectCV
                 statusBarText.Text = String.Format("{0}", sensor.UniqueKinectId);
 
                 // tilt if necessary
-                this.sensor.ElevationAngle = 10;
+                this.sensor.ElevationAngle = 20;
             }
         }
 
@@ -280,7 +283,7 @@ namespace KinectCV
 
             #region use the emgu images to do something interesting
 
-            int demo = 1;
+            int demo = 2;
 
 
             // DEMO 0: You
@@ -297,19 +300,22 @@ namespace KinectCV
             }
 
             // DEMO 1: blur and boost
-            else if (demo == 1 && skeleton != null && colourImage != null && depthImage != null)
+            else if (demo == 1 && skeleton != null && colourImage != null 
+                && depthImage != null)
             {
                 SkeletonPoint sleft = skeleton.Joints[JointType.HandLeft].Position;
                 SkeletonPoint sright = skeleton.Joints[JointType.HandRight].Position;
                 double hand_x_dist = Math.Abs(sleft.X - sright.Y);
                 double hand_y_dist = Math.Abs(sleft.Y - sright.Y);
 
-                displayImage = colourImage.Resize(0.5, INTER.CV_INTER_NN); // scale by 2 to speed up
+                // scale by 2 to speed up
+                displayImage = colourImage.Resize(0.5, INTER.CV_INTER_NN); 
                 // displayImage = colourImage.Copy(); // slower
 
                 // boost the RGB values based on vertical hand distance 
                 float boost = 3 - (float)(hand_y_dist * 5);
-                displayImage = colourImage.Convert(delegate(Byte b) { return (byte)((b * boost < 255) ? (b * boost) : 255); });
+                displayImage = colourImage.Convert(delegate(Byte b) 
+                    { return (byte)((b * boost < 255) ? (b * boost) : 255); });
 
                 // blur based on horizontal hand distance
                 int blur = (int)(hand_x_dist * 20);
@@ -321,17 +327,21 @@ namespace KinectCV
                 {
                     debugImg2 = depthImage.Convert<Bgr, Byte>();
                     DepthImagePoint dp;
-                    dp = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sleft, sensor.DepthStream.Format);
+                    dp = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sleft, 
+                        sensor.DepthStream.Format);
                     debugImg2.Draw(new CircleF(dp.ToPointF(), 20), new Bgr(Color.Coral), 1);
-                    dp = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sright, sensor.DepthStream.Format);
+                    dp = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sright, 
+                        sensor.DepthStream.Format);
                     debugImg2.Draw(new CircleF(dp.ToPointF(), 20), new Bgr(Color.LightGreen), 1);
-                    Utilities.WriteDebugText(debugImg2, 10, 40, "{0:.00}m {1:0.00}m", hand_x_dist, hand_y_dist);
+                    Utilities.WriteDebugText(debugImg2, 10, 40, "{0:.00}m {1:0.00}m", 
+                        hand_x_dist, hand_y_dist);
                 }
 
             }
 
             // DEMO 2: Painting 
-            else if (demo == 2 && skeleton != null && colourImage != null && depthImage != null)
+            else if (demo == 2 && skeleton != null && 
+                colourImage != null && depthImage != null)
             {
                 // create a player mask for player we want
                 byte playerIndex = (byte)(Array.IndexOf(skeletons, skeleton) + 1);
@@ -341,7 +351,8 @@ namespace KinectCV
                 //playerMasks.MinMax(out min, out max, out pmin, out pmax);
 
                 // pick the player mask for the skeleton we're tracking
-                Image<Gray, Byte> playerMask = playerMasks.Convert(delegate(Byte b) { return (Byte)(b == playerIndex ? 255 : 0); });
+                Image<Gray, Byte> playerMask = playerMasks.Convert(delegate(Byte b) 
+                    { return (Byte)(b == playerIndex ? 255 : 0); });
 
                 // register depth to Rgb using Emgu
                 // compute homography if first frame
@@ -350,7 +361,8 @@ namespace KinectCV
                         depthImage.Convert<Gray, byte>(), sensor);
                 // do the registration warp
                 Image<Gray, byte> registeredplayerMask = playerMask.WarpPerspective(
-                    depthToRGBHomography, INTER.CV_INTER_CUBIC, WARP.CV_WARP_DEFAULT, new Gray(0));
+                    depthToRGBHomography, INTER.CV_INTER_CUBIC, WARP.CV_WARP_DEFAULT, 
+                    new Gray(0));
 
                 // create the display image background
                 // blended RGB and player mask
@@ -392,7 +404,8 @@ namespace KinectCV
                 // hands become a brush or eraser when more that 250 mm closer to kinect
                 float brushThresh = (sposition.Z * 1000) - 250;
 
-                // the brush is the player depth image, but only body parts below the brush threshold
+                // the brush is the player depth image, but only body parts below the 
+                // brush threshold
                 brushMask = playerDepth.Copy();
                 brushMask = brushMask.ThresholdToZeroInv(new Gray(brushThresh));
 
@@ -402,12 +415,14 @@ namespace KinectCV
 
                 // update the brush image
                 brushImage.SetZero();
-                brushImage.SetValue(brushColour, brushMask.Convert<Gray, byte>().Resize(2, INTER.CV_INTER_NN));
+                brushImage.SetValue(brushColour, 
+                    brushMask.Convert<Gray, byte>().Resize(2, INTER.CV_INTER_NN));
                 brushImage = brushImage.SmoothBlur(10, 10);
 
                 // create the painting image if first time
                 if (paintingImage == null)
-                    paintingImage = new Image<Bgr, byte>(displayImage.Width, displayImage.Height);
+                    paintingImage = 
+                        new Image<Bgr, byte>(displayImage.Width, displayImage.Height);
 
                 // layer on a bit of paint each frame
                 paintingImage = paintingImage.Add(brushImage * 0.05);
@@ -420,13 +435,18 @@ namespace KinectCV
                 {
                     debugImg2 = depthImage.Convert<Bgr, Byte>();
                     DepthImagePoint dp;
-                    dp = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sleft, sensor.DepthStream.Format);
-                    debugImg2.Draw(new CircleF(dp.ToPointF(), 20), new Bgr(Color.Coral), 1);
+                    dp = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(
+                        sleft, sensor.DepthStream.Format);
+                    debugImg2.Draw(new CircleF(dp.ToPointF(), 20), 
+                        new Bgr(Color.Coral), 1);
                     dp = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(sright, sensor.DepthStream.Format);
-                    debugImg2.Draw(new CircleF(dp.ToPointF(), 20), new Bgr(Color.LightGreen), 1);
+                    debugImg2.Draw(new CircleF(dp.ToPointF(), 20), 
+                        new Bgr(Color.LightGreen), 1);
                     dp = sensor.CoordinateMapper.MapSkeletonPointToDepthPoint(shead, sensor.DepthStream.Format);
-                    debugImg2.Draw(new CircleF(dp.ToPointF(), 20), new Bgr(Color.Cyan), 1);
-                    Utilities.WriteDebugText(debugImg2, 10, 40, "Player: {0} {1}", playerId, playerIndex);
+                    debugImg2.Draw(new CircleF(dp.ToPointF(), 20), 
+                        new Bgr(Color.Cyan), 1);
+                    Utilities.WriteDebugText(debugImg2, 10, 40, "Player: {0} {1}", 
+                        playerId, playerIndex);
 
                 }
 
@@ -434,14 +454,15 @@ namespace KinectCV
 
                 // colour picker interaction
                 // - - - - - - - - - - - - -
-                // pick colours by creating a "depth hole" by joining index finger and thumb of 
-                // opposite hands
+                // pick colours by creating a "depth hole" by joining index finger and 
+                // thumb of opposite hands
 
                 // hands can form a picker hole when more than 150 mm closer to kinect
                 float pickerThresh = (sposition.Z * 1000) - 150;
 
                 // isolate part of depth where picker can appear
-                Image<Gray, float> pickerImage = playerDepth.ThresholdToZeroInv(new Gray(pickerThresh));
+                Image<Gray, float> pickerImage = playerDepth.ThresholdToZeroInv(
+                    new Gray(pickerThresh));
 
                 // clean up small pixels and noise with morpholigical operations
                 pickerImage = pickerImage.Dilate(2).Erode(2);
@@ -449,8 +470,10 @@ namespace KinectCV
                 if (ShowDebug)
                 {
                     debugImg1 = new Image<Bgr, byte>(pickerImage.Width, pickerImage.Height);
-                    debugImg1.SetValue(new Bgr(Color.Yellow), pickerImage.Convert<Gray, Byte>());
-                    debugImg1.SetValue(new Bgr(Color.OrangeRed), brushMask.Convert<Gray, Byte>());
+                    debugImg1.SetValue(new Bgr(Color.Yellow), 
+                        pickerImage.Convert<Gray, Byte>());
+                    debugImg1.SetValue(new Bgr(Color.OrangeRed), 
+                        brushMask.Convert<Gray, Byte>());
                 }
 
                 // use contours to look for hole
@@ -464,8 +487,9 @@ namespace KinectCV
 
                 // detect two levels of image contours (RETR_TYPE.CV_RETR_CCOMP) 
                 // contours is a list of all contours found at top level
-                for (contours = pickerImageByte.FindContours(CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE,
-                                                                RETR_TYPE.CV_RETR_CCOMP);
+                for (contours = pickerImageByte.FindContours(
+                    CHAIN_APPROX_METHOD.CV_CHAIN_APPROX_SIMPLE,
+                    RETR_TYPE.CV_RETR_CCOMP);
                         contours != null;
                         contours = contours.HNext)
                 {
@@ -487,7 +511,8 @@ namespace KinectCV
                     }
                 }
 
-                // if we found a hole, we can get the colour in the RGB image at that position
+                // if we found a hole, we can get the colour in the RGB image 
+                // at that position
                 if (pickerPoint != PointF.Empty)
                 {
                     // get the RGB pixel at the picker depth point
@@ -495,10 +520,15 @@ namespace KinectCV
                     dp.X = (int)pickerPoint.X;
                     dp.Y = (int)pickerPoint.Y;
                     dp.Depth = (int)depthImage[dp.Y, dp.X].Intensity;
-                    ColorImagePoint cp = sensor.CoordinateMapper.MapDepthPointToColorPoint(sensor.DepthStream.Format, dp, sensor.ColorStream.Format);
+                    ColorImagePoint cp = 
+                        sensor.CoordinateMapper.MapDepthPointToColorPoint(
+                        sensor.DepthStream.Format, dp, sensor.ColorStream.Format);
 
                     // if we got a valid RGB point, get the colour
-                    if (cp.X > 0 && cp.X < colourImage.Width && cp.Y > 0 && cp.Y < colourImage.Height)
+                    if (cp.X > 0 && 
+                        cp.X < colourImage.Width && 
+                        cp.Y > 0 && 
+                        cp.Y < colourImage.Height)
                     {
                         // get the Emgu colour
                         Bgr c = colourImage[cp.Y, cp.X];
@@ -553,7 +583,9 @@ namespace KinectCV
                 if (DisplayImageHelper == null)
                 {
                     // InteropBitmapHelper is a helper class to do the conversion
-                    DisplayImageHelper = new InteropBitmapHelper(displayImage.Width, displayImage.Height, displayImage.Bytes, PixelFormats.Bgr24);
+                    DisplayImageHelper = 
+                        new InteropBitmapHelper(displayImage.Width, 
+                            displayImage.Height, displayImage.Bytes, PixelFormats.Bgr24);
                     DisplayImage.Source = DisplayImageHelper.InteropBitmap;
                 }
                 // convert here using the helper object
